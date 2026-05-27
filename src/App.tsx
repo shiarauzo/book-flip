@@ -1,8 +1,10 @@
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
-import { Book, type ChapterMark } from "./Book";
+import { Book } from "./Book";
+import { createAliceSource } from "./sources/aliceSource";
+import type { ChapterMark } from "./sources/pageSource";
 
 export default function App() {
   const [page, setPage] = useState(0);
@@ -10,6 +12,9 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [chapters, setChapters] = useState<ChapterMark[]>([]);
   const [toc, setToc] = useState(false);
+
+  // The active page source. Default: the built-in Alice demo. (PDF upload swaps this.)
+  const source = useMemo(() => createAliceSource(), []);
 
   const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
@@ -99,6 +104,7 @@ export default function App() {
         <Suspense fallback={null}>
           <Environment preset="apartment" />
           <Book
+            source={source}
             page={page}
             onTotal={setTotal}
             onTurn={turn}
