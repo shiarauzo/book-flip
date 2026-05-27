@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { createBendMaterial } from "./bendMaterial";
-import { layoutBook, renderPage, type PageDesc } from "./textures";
+import type { ChapterMark, PageSource } from "./sources/pageSource";
 import { useReducedMotion } from "./useReducedMotion";
 
 const PAGE_W = 2.2;
@@ -17,9 +17,8 @@ const CAM_OPEN = new THREE.Vector3(0.05, 0.55, 6.85);
 const LOOK_CLOSED = new THREE.Vector3(0.5, 0.0, 0.0);
 const LOOK_OPEN = new THREE.Vector3(0.05, 0.0, 0.0);
 
-export type ChapterMark = { roman: string; title: string; page: number };
-
 type BookProps = {
+  source: PageSource;
   page: number;
   onTotal: (total: number) => void;
   onTurn: (dir: 1 | -1) => void;
@@ -38,30 +37,17 @@ function blankTexture(): THREE.CanvasTexture {
   return t;
 }
 
-export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) {
+export function Book({ source, page, onTotal, onTurn, onReady, onChapters }: BookProps) {
   const { camera } = useThree();
   const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
 
-  // Page descriptors for the whole book (CPU-only). Textures are made on demand.
-  const faces = useMemo<PageDesc[]>(() => layoutBook(), []);
-  // faces.length is odd by construction; the final spread (page = sheets) shows
-  // the last page on the left and "The End" on the right.
-  const sheets = (faces.length - 1) / 2;
+  // faceCount is odd by construction; the final spread (page = sheets) shows the
+  // last page on the left and a recto on the right.
+  const sheets = (source.faceCount - 1) / 2;
 
   useEffect(() => onTotal(sheets), [sheets, onTotal]);
-
-  // Each chapter's opening page → the spread (page index) that reveals it.
-  const chapters = useMemo<ChapterMark[]>(() => {
-    const out: ChapterMark[] = [];
-    faces.forEach((f, i) => {
-      if (f.kind === "content" && f.heading) {
-        out.push({ roman: f.heading.roman, title: f.heading.title, page: Math.ceil(i / 2) });
-      }
-    });
-    return out;
-  }, [faces]);
-  useEffect(() => onChapters(chapters), [chapters, onChapters]);
+  useEffect(() => onChapters(source.chapters), [source, onChapters]);
 
   // Geometry: right page (x:0..W), left page (x:-W..0), and a back-face geometry
   // with flipped U so the turning sheet's back reads correctly without mirroring
@@ -85,15 +71,42 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
     return { rightGeo, leftGeo, backGeo, blank, flatLeft, flatRight, flipFront, flipBack, blockMat };
   }, []);
 
-  // Lazy texture cache keyed by face index, with a sliding window.
+  // Lazy texture cache keyed by face index, with a sliding window. renderFace may
+  // be async (e.g. PDF pages): a `pending` set guards against duplicate renders,
+  // and a stale-source guard discards textures that resolve after a source swap.
   const cache = useRef(new Map<number, THREE.CanvasTexture>());
+  const pending = useRef(new Set<number>());
+  const sourceRef = useRef(source);
+  sourceRef.current = source;
+
   const face = (i: number): THREE.CanvasTexture => cache.current.get(i) ?? built.blank;
   const ensureWindow = (center: number) => {
     const lo = center - 3;
     const hi = center + 4;
     for (let i = lo; i <= hi; i++) {
-      if (i >= 0 && i < faces.length && !cache.current.has(i)) {
-        cache.current.set(i, renderPage(faces[i]));
+      if (i < 0 || i >= source.faceCount || cache.current.has(i) || pending.current.has(i)) continue;
+      let tex: THREE.CanvasTexture | Promise<THREE.CanvasTexture>;
+      try {
+        tex = source.renderFace(i);
+      } catch {
+        continue; // a bad page falls back to the blank texture
+      }
+      if (tex instanceof Promise) {
+        const owner = source;
+        pending.current.add(i);
+        tex
+          .then((t) => {
+            pending.current.delete(i);
+            if (sourceRef.current === owner) {
+              cache.current.set(i, t);
+              invalidate();
+            } else {
+              t.dispose();
+            }
+          })
+          .catch(() => pending.current.delete(i));
+      } else {
+        cache.current.set(i, tex);
       }
     }
     for (const [k, tex] of cache.current) {
@@ -118,6 +131,17 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
   const hoverAmt = useRef(0);
   const lookAt = useRef(LOOK_CLOSED.clone());
   const camPos = useRef(CAM_CLOSED.clone());
+
+  // On source swap, drop the old book's textures and start fresh from the cover.
+  useEffect(() => {
+    for (const tex of cache.current.values()) tex.dispose();
+    cache.current.clear();
+    pending.current.clear();
+    displayed.current = 0;
+    ensureWindow(0);
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source]);
 
   // Prepare textures around the target page; snap (no riffle) on big jumps.
   useEffect(() => {
@@ -165,7 +189,7 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
 
   const showMap = (mesh: THREE.Mesh | null, mat: THREE.MeshStandardMaterial, idx: number) => {
     if (!mesh) return;
-    if (idx < 0 || idx >= faces.length) {
+    if (idx < 0 || idx >= source.faceCount) {
       mesh.visible = false;
       return;
     }
