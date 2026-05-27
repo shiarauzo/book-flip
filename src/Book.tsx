@@ -120,6 +120,7 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
 
   const group = useRef<THREE.Group>(null);
   const progs = useRef<number[]>(leaves.map(() => 0));
+  const vels = useRef<number[]>(leaves.map(() => 0));
   const openness = useRef(0);
   const lookAt = useRef(LOOK_CLOSED.clone());
   const camPos = useRef(CAM_CLOSED.clone());
@@ -140,11 +141,28 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
     let busy = false;
 
     // Each leaf eases toward turned (1) or not (0); only the one being flipped moves.
+    // A lightly under-damped spring gives the page a real flick-and-settle with a
+    // touch of overshoot past flat. Reduced motion falls back to a quick snap.
     for (let i = 0; i < leaves.length; i++) {
       const target = i < page ? 1 : 0;
-      const v = THREE.MathUtils.damp(progs.current[i], target, turnLambda, dt);
-      progs.current[i] = Math.abs(v - target) < EPS ? target : ((busy = true), v);
-      leaves[i].uniforms.uProgress.value = progs.current[i];
+      let x = progs.current[i];
+      if (reduced) {
+        x = THREE.MathUtils.damp(x, target, turnLambda, dt);
+        vels.current[i] = 0;
+        if (Math.abs(x - target) > EPS) busy = true;
+        else x = target;
+      } else {
+        const accel = (target - x) * 150 - vels.current[i] * 17;
+        vels.current[i] += accel * dt;
+        x = THREE.MathUtils.clamp(x + vels.current[i] * dt, -0.06, 1.06);
+        if (Math.abs(x - target) > EPS || Math.abs(vels.current[i]) > EPS) busy = true;
+        else {
+          x = target;
+          vels.current[i] = 0;
+        }
+      }
+      progs.current[i] = x;
+      leaves[i].uniforms.uProgress.value = x;
     }
 
     const oTarget = page > 0 ? 1 : 0;
