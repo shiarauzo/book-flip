@@ -189,19 +189,75 @@ export function coverTexture(): THREE.CanvasTexture {
   return toTexture(c);
 }
 
-/** Inner title page. */
+/** The White Rabbit's engraved pocket watch — frontispiece motif ("I shall be late!"). */
+function pocketWatch(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
+  ctx.save();
+  ctx.strokeStyle = INK;
+  ctx.fillStyle = INK;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  // Crown stem + bow ring at the top.
+  ctx.fillRect(cx - 8, cy - r - 20, 16, 16);
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(cx, cy - r - 26, 13, Math.PI * 0.12, Math.PI * 0.88, false);
+  ctx.stroke();
+
+  // Case + inner bezel.
+  ctx.lineWidth = 9;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 14, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Roman numerals around the dial.
+  const nums = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `500 ${Math.round(r * 0.2)}px ${SERIF}`;
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+    const rr = r - 34;
+    ctx.fillText(nums[i], cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+  }
+
+  // Hands — a few minutes to noon, ever so late.
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(-Math.PI / 2 + 0.5) * r * 0.4, cy + Math.sin(-Math.PI / 2 + 0.5) * r * 0.4);
+  ctx.stroke();
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + Math.cos(-Math.PI / 2 - 0.28) * r * 0.62, cy + Math.sin(-Math.PI / 2 - 0.28) * r * 0.62);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** Inner title page, opening on the pocket-watch frontispiece. */
 export function titlePageTexture(): THREE.CanvasTexture {
   const { c, ctx } = canvas();
   paperFill(ctx);
 
   const cx = CW / 2;
-  spacedCaps(ctx, "Alice's Adventures", cx, 470, 58, 4, INK, "400");
-  spacedCaps(ctx, "in Wonderland", cx, 560, 58, 4, INK, "400");
-  divider(ctx, cx, 660, 300, INK_SOFT);
-  spacedCaps(ctx, "by", cx, 760, 30, 4, INK_SOFT, "400");
-  spacedCaps(ctx, "Lewis Carroll", cx, 830, 44, 8, INK, "400");
-  spacedCaps(ctx, "With Forty-Two Illustrations", cx, CH - 320, 24, 4, INK_SOFT, "400");
-  spacedCaps(ctx, "by John Tenniel", cx, CH - 280, 24, 4, INK_SOFT, "400");
+  pocketWatch(ctx, cx, 320, 140);
+
+  spacedCaps(ctx, "Alice's Adventures", cx, 600, 54, 4, INK, "400");
+  spacedCaps(ctx, "in Wonderland", cx, 685, 54, 4, INK, "400");
+  divider(ctx, cx, 775, 300, INK_SOFT);
+  spacedCaps(ctx, "by", cx, 865, 28, 4, INK_SOFT, "400");
+  spacedCaps(ctx, "Lewis Carroll", cx, 930, 42, 8, INK, "400");
+  spacedCaps(ctx, "With Forty-Two Illustrations", cx, CH - 300, 24, 4, INK_SOFT, "400");
+  spacedCaps(ctx, "by John Tenniel", cx, CH - 262, 24, 4, INK_SOFT, "400");
   spacedCaps(ctx, "VolumeOne Publishing", cx, CH - 150, 22, 5, INK_SOFT, "400");
 
   return toTexture(c);
