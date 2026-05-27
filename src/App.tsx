@@ -55,6 +55,17 @@ export default function App() {
     [alice],
   );
 
+  const resetToAlice = useCallback(() => {
+    setSource((prev) => {
+      if (prev !== alice) prev.dispose();
+      return alice;
+    });
+    setPage(0);
+    setError(null);
+  }, [alice]);
+
+  const isPdf = source !== alice;
+
   const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
   const turn = useCallback((dir: 1 | -1) => (dir < 0 ? prev() : next()), [prev, next]);
@@ -166,24 +177,35 @@ export default function App() {
         {announce}
       </div>
 
+      <p className="book-label" title={source.label}>
+        {source.label}
+      </p>
+
       <UploadButton onFile={loadPdf} busy={busy} />
+      {isPdf && (
+        <button type="button" className="reset-btn" onClick={resetToAlice}>
+          ↺ Alice
+        </button>
+      )}
 
       {busy && <LoadingOverlay label={loadingLabel} progress={progress} />}
 
       {error && <ErrorToast message={error} onClose={() => setError(null)} />}
 
-      {/* Table of contents */}
-      <button
-        type="button"
-        className="toc-toggle"
-        aria-expanded={toc}
-        aria-controls="toc-panel"
-        onClick={() => setToc((o) => !o)}
-      >
-        {toc ? "Close" : "Contents"}
-      </button>
+      {/* Table of contents — only when this book exposes chapters/bookmarks */}
+      {chapters.length > 0 && (
+        <button
+          type="button"
+          className="toc-toggle"
+          aria-expanded={toc}
+          aria-controls="toc-panel"
+          onClick={() => setToc((o) => !o)}
+        >
+          {toc ? "Close" : "Contents"}
+        </button>
+      )}
 
-      {toc && (
+      {toc && chapters.length > 0 && (
         <>
           <div className="toc-scrim" onClick={() => setToc(false)} aria-hidden="true" />
           <nav id="toc-panel" className="toc" aria-label="Table of contents">
