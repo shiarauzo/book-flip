@@ -99,6 +99,7 @@ body {
   display: grid;
   place-items: center;
   padding: 22px;
+  pointer-events: none; /* purely visual — drop is handled on window */
   background: rgba(31, 78, 70, 0.14);
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
