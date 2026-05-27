@@ -31,9 +31,17 @@ export function validatePdfFile(file: File): PdfError | null {
 }
 
 /** Load a PDF document from file bytes, mapping pdf.js failures to PdfError. */
-export async function loadPdfDocument(data: ArrayBuffer): Promise<PDFDocumentProxy> {
+export async function loadPdfDocument(
+  data: ArrayBuffer,
+  onProgress?: (fraction: number) => void,
+): Promise<PDFDocumentProxy> {
   try {
-    return await pdfjs.getDocument({ data }).promise;
+    const task = pdfjs.getDocument({ data });
+    if (onProgress) {
+      task.onProgress = ({ loaded, total }: { loaded: number; total: number }) =>
+        onProgress(total > 0 ? Math.min(loaded / total, 1) : 0);
+    }
+    return await task.promise;
   } catch (err: unknown) {
     const name = (err as { name?: string })?.name ?? "";
     if (name === "PasswordException") {

@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { Book } from "./Book";
 import { createAliceSource } from "./sources/aliceSource";
 import type { ChapterMark, PageSource } from "./sources/pageSource";
+import { LoadingOverlay } from "./ui/LoadingOverlay";
 import { UploadButton } from "./ui/UploadButton";
 
 export default function App() {
@@ -18,6 +19,8 @@ export default function App() {
   const alice = useMemo(() => createAliceSource(), []);
   const [source, setSource] = useState<PageSource>(alice);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadingLabel, setLoadingLabel] = useState("");
 
   const loadPdf = useCallback(
     async (file: File) => {
@@ -27,11 +30,13 @@ export default function App() {
         window.alert(bad.message); // V5 replaces this with an in-app toast
         return;
       }
+      setLoadingLabel(file.name.replace(/\.pdf$/i, ""));
+      setProgress(0);
       setBusy(true);
       try {
         const { createPdfSource } = await import("./sources/pdfSource");
         const buf = await file.arrayBuffer();
-        const doc = await loadPdfDocument(buf);
+        const doc = await loadPdfDocument(buf, setProgress);
         const next = await createPdfSource(doc, file.name.replace(/\.pdf$/i, ""));
         setSource((prev) => {
           if (prev !== alice) prev.dispose();
@@ -159,6 +164,8 @@ export default function App() {
       </div>
 
       <UploadButton onFile={loadPdf} busy={busy} />
+
+      {busy && <LoadingOverlay label={loadingLabel} progress={progress} />}
 
       {/* Table of contents */}
       <button
