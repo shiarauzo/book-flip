@@ -60,6 +60,47 @@ function noiseCanvas(): HTMLCanvasElement {
   return n;
 }
 
+/** Cloth-bound cover fill: base colour, a fine linen weave, grain, and vignette. */
+function clothFill(ctx: CanvasRenderingContext2D, base: string) {
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, CW, CH);
+
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < CW; x += 4) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, CH);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 0.07;
+  ctx.strokeStyle = "#000000";
+  for (let yy = 0; yy < CH; yy += 4) {
+    ctx.beginPath();
+    ctx.moveTo(0, yy);
+    ctx.lineTo(CW, yy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const pat = ctx.createPattern(noiseCanvas(), "repeat");
+  if (pat) {
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = pat;
+    ctx.fillRect(0, 0, CW, CH);
+    ctx.restore();
+  }
+
+  const g = ctx.createRadialGradient(CW / 2, CH / 2, 100, CW / 2, CH / 2, CH);
+  g.addColorStop(0, "rgba(255,255,255,0.06)");
+  g.addColorStop(1, "rgba(0,0,0,0.22)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, CW, CH);
+}
+
 /** Warm paper fill: base colour, fine grain, and a soft inner vignette. */
 function paperFill(ctx: CanvasRenderingContext2D, base = PAPER) {
   ctx.fillStyle = base;
@@ -129,14 +170,7 @@ function divider(ctx: CanvasRenderingContext2D, cx: number, y: number, w: number
 /** Front cover — the book's title. */
 export function coverTexture(): THREE.CanvasTexture {
   const { c, ctx } = canvas();
-  ctx.fillStyle = TEAL;
-  ctx.fillRect(0, 0, CW, CH);
-
-  const g = ctx.createRadialGradient(CW / 2, CH / 2, 100, CW / 2, CH / 2, CH);
-  g.addColorStop(0, "rgba(255,255,255,0.05)");
-  g.addColorStop(1, "rgba(0,0,0,0.18)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, CW, CH);
+  clothFill(ctx, TEAL);
 
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 3;
