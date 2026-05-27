@@ -210,12 +210,14 @@ export default function App() {
         {source.label}
       </p>
 
-      <UploadButton onFile={loadPdf} busy={busy} />
-      {isPdf && (
-        <button type="button" className="reset-btn" onClick={resetToAlice}>
-          ↺ Alice
-        </button>
-      )}
+      <div className="top-actions">
+        {isPdf && (
+          <button type="button" className="reset-btn" onClick={resetToAlice}>
+            ↺ Alice
+          </button>
+        )}
+        <UploadButton onFile={loadPdf} busy={busy} />
+      </div>
 
       {busy && <LoadingOverlay label={loadingLabel} progress={progress} />}
 
@@ -226,6 +228,14 @@ export default function App() {
           <div className="dropzone__inner">Drop your PDF to read it</div>
         </div>
       )}
+
+      {/* Phones: the spread is widest in landscape — nudge a rotate (CSS-gated). */}
+      <div className="rotate-hint" aria-hidden="true">
+        <div className="rotate-hint__inner">
+          <span className="rotate-hint__icon">↻</span>
+          <span>Rotate your phone to read the book</span>
+        </div>
+      </div>
 
       {/* Table of contents — only when this book exposes chapters/bookmarks */}
       {chapters.length > 0 && (
