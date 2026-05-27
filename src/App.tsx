@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { Book } from "./Book";
 import { createAliceSource } from "./sources/aliceSource";
 import type { ChapterMark, PageSource } from "./sources/pageSource";
+import { ErrorToast } from "./ui/ErrorToast";
 import { LoadingOverlay } from "./ui/LoadingOverlay";
 import { UploadButton } from "./ui/UploadButton";
 
@@ -21,13 +22,15 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingLabel, setLoadingLabel] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const loadPdf = useCallback(
     async (file: File) => {
+      setError(null);
       const { validatePdfFile, loadPdfDocument } = await import("./pdf/loadPdf");
       const bad = validatePdfFile(file);
       if (bad) {
-        window.alert(bad.message); // V5 replaces this with an in-app toast
+        setError(bad.message);
         return;
       }
       setLoadingLabel(file.name.replace(/\.pdf$/i, ""));
@@ -44,7 +47,7 @@ export default function App() {
         });
         setPage(0);
       } catch (e) {
-        window.alert((e as Error).message ?? "Couldn't open that PDF.");
+        setError((e as Error).message ?? "Couldn't open that PDF.");
       } finally {
         setBusy(false);
       }
@@ -166,6 +169,8 @@ export default function App() {
       <UploadButton onFile={loadPdf} busy={busy} />
 
       {busy && <LoadingOverlay label={loadingLabel} progress={progress} />}
+
+      {error && <ErrorToast message={error} onClose={() => setError(null)} />}
 
       {/* Table of contents */}
       <button
