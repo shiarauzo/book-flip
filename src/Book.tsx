@@ -217,8 +217,15 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
         onPointerOver={() => setCursor("pointer")}
         onPointerOut={() => setCursor("auto")}
       >
-        {/* back cover (static, revealed once every leaf has turned) */}
-        <mesh geometry={geometry} material={backMat} position={[0, 0, 0.012]} />
+        {/* page block — the physical bulk of paper, giving the book real
+            thickness and a cream fore-edge. The hardcover overhangs it slightly. */}
+        <mesh position={[PAGE_W / 2, 0, -0.074]}>
+          <boxGeometry args={[PAGE_W * 0.97, PAGE_H * 0.98, 0.172]} />
+          <meshStandardMaterial color="#e7dfcf" roughness={0.95} />
+        </mesh>
+
+        {/* back cover (static, behind the block; revealed once every leaf turns) */}
+        <mesh geometry={geometry} material={backMat} position={[0, 0, -0.165]} />
 
         {/* leaves — front + back share one bend uniforms set; stackZ lives in the
             shader so the flip inverts sheet order, like a real book. */}
@@ -229,9 +236,9 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
           </group>
         ))}
 
-        {/* spine */}
-        <mesh position={[0, 0, 0.025]}>
-          <boxGeometry args={[0.05, PAGE_H, 0.06]} />
+        {/* spine — wraps the bound edge across the full thickness */}
+        <mesh position={[0, 0, -0.056]}>
+          <boxGeometry args={[0.06, PAGE_H, 0.24]} />
           <meshStandardMaterial color={COVER} roughness={0.8} />
         </mesh>
       </group>
