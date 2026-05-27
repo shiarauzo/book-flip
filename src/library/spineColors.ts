@@ -7,7 +7,7 @@ const PALETTE = [
   { bg: "#3d5a3a", ink: "#e3d39a" }, // olive
   { bg: "#4a2f55", ink: "#e0c9ec" }, // plum
   { bg: "#8a4b22", ink: "#f0d9b5" }, // rust
-  { bg: "#2f5d5a", ink: "#d8b46a" }, // teal
+  { bg: "#33403a", ink: "#cfc3a0" }, // charcoal-green (distinct from Alice's teal)
 ];
 
 export function spineColors(seed: string): { bg: string; ink: string } {

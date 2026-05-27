@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { Book } from "./Book";
 import { CameraRig, type CamTarget } from "./CameraRig";
 import { Shelf, type ShelfBook } from "./shelf/Shelf";
-import { addPdf, getPdfBytes, listPdfs } from "./library/db";
+import { addPdf, getPdfBytes, listPdfs, removePdf } from "./library/db";
 import { spineColors } from "./library/spineColors";
 import { createAliceSource } from "./sources/aliceSource";
 import type { ChapterMark, PageSource } from "./sources/pageSource";
@@ -32,6 +32,7 @@ export default function App() {
   // Home is the shelf; opening a book pulls it out (transitioning) then reads.
   const [view, setView] = useState<"shelf" | "transitioning" | "reading">("shelf");
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fading, setFading] = useState(false);
   const camTarget = useRef<CamTarget>({
     pos: new THREE.Vector3(0, 0, 6.5),
@@ -105,6 +106,15 @@ export default function App() {
     },
     [resolveSource],
   );
+
+  const removeBook = useCallback((id: string) => {
+    if (id === "alice") return;
+    removePdf(id).catch(() => {});
+    sourcesById.current.get(id)?.dispose();
+    sourcesById.current.delete(id);
+    setLibrary((prev) => prev.filter((b) => b.id !== id));
+    setSelectedId(null);
+  }, []);
 
   const backToShelf = useCallback(() => {
     setFading(true);
@@ -250,6 +260,30 @@ export default function App() {
         {view === "shelf" ? "Your bookshelf" : `${source.label} — an interactive 3D book`}
       </h1>
 
+      {/* Keyboard / screen-reader access to the 3D shelf: focusing a book lifts
+          its spine; Enter opens it. */}
+      {view === "shelf" && (
+        <nav className="sr-only" aria-label="Bookshelf">
+          {library.map((b) => (
+            <span key={b.id}>
+              <button
+                type="button"
+                onClick={() => openBook(b)}
+                onFocus={() => setSelectedId(b.id)}
+                onBlur={() => setSelectedId(null)}
+              >
+                Open {b.title}
+              </button>
+              {b.id !== "alice" && (
+                <button type="button" onClick={() => removeBook(b.id)}>
+                  Remove {b.title} from the shelf
+                </button>
+              )}
+            </span>
+          ))}
+        </nav>
+      )}
+
       <div className={`loader${ready ? " loader--hidden" : ""}`} aria-hidden="true" />
 
       {/* Quick dissolve that masks the shelf↔reading swap. */}
@@ -295,6 +329,7 @@ export default function App() {
             books={library}
             camTarget={camTarget}
             openingId={openingId}
+            selectedId={selectedId}
             onOpen={openBook}
             onReady={() => setReady(true)}
           />

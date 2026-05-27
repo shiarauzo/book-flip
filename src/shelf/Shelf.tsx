@@ -16,10 +16,10 @@ const BOOK_D = 2.0; // page width (depth into shelf)
 const BOOK_T = 0.55; // spine thickness
 const GAP = 0.16;
 const WOOD = "#6b4a32";
+const WOOD_DARK = "#5a3d28";
 
 const SHELF_POS = new THREE.Vector3(0, 0, 6.5);
 const SHELF_LOOK = new THREE.Vector3(0, 0, 0);
-// Where the camera eases to as a book is pulled out (matches reading-closed framing).
 const PRESENT_POS = new THREE.Vector3(0.2, 0.3, 6.0);
 const PRESENT_LOOK = new THREE.Vector3(0.1, 0, 0);
 
@@ -31,17 +31,20 @@ function SpineBook({
   book,
   x,
   opening,
+  selected,
   onOpen,
 }: {
   book: ShelfBook;
   x: number;
   opening: boolean;
+  selected: boolean;
   onOpen: () => void;
 }) {
   const invalidate = useThree((s) => s.invalidate);
   const mesh = useRef<THREE.Mesh>(null);
-  const hover = useRef(0);
+  const hovered = useRef(false);
   const pull = useRef(0);
+  const lift = useRef(0);
 
   const materials = useMemo(() => {
     const side = new THREE.MeshStandardMaterial({ color: book.spineBg ?? "#1f4e46", roughness: 0.7 });
@@ -67,17 +70,18 @@ function SpineBook({
     const dt = Math.min(delta, 1 / 30);
     let busy = false;
 
-    // Pull the chosen book out and tip it toward the reader; others stay put.
     const pullT = opening ? 1 : 0;
     pull.current = THREE.MathUtils.damp(pull.current, pullT, 7, dt);
     if (Math.abs(pull.current - pullT) > 1e-3) busy = true;
 
-    const hv = !opening && hover.current > 0 ? hover.current : 0;
+    // Lift on hover or keyboard selection (smoothly).
+    const liftT = !opening && (hovered.current || selected) ? 1 : 0;
+    lift.current = THREE.MathUtils.damp(lift.current, liftT, 10, dt);
+    if (Math.abs(lift.current - liftT) > 1e-3) busy = true;
 
-    m.position.set(x, pull.current * 0.45 + hv * 0.12, pull.current * 1.8 + hv * 0.35);
+    m.position.set(x, pull.current * 0.45 + lift.current * 0.14, pull.current * 1.8 + lift.current * 0.4);
     m.rotation.y = pull.current * -0.5;
-    const s = 1 + pull.current * 0.04;
-    m.scale.setScalar(s);
+    m.scale.setScalar(1 + pull.current * 0.04 + lift.current * 0.02);
 
     if (busy) invalidate();
   });
@@ -93,12 +97,12 @@ function SpineBook({
       }}
       onPointerOver={() => {
         setCursor("pointer");
-        hover.current = 1;
+        hovered.current = true;
         invalidate();
       }}
       onPointerOut={() => {
         setCursor("auto");
-        hover.current = 0;
+        hovered.current = false;
         invalidate();
       }}
     >
@@ -111,11 +115,12 @@ type Props = {
   books: ShelfBook[];
   camTarget: MutableRefObject<CamTarget>;
   openingId: string | null;
+  selectedId: string | null;
   onOpen: (book: ShelfBook) => void;
   onReady: () => void;
 };
 
-export function Shelf({ books, camTarget, openingId, onOpen, onReady }: Props) {
+export function Shelf({ books, camTarget, openingId, selectedId, onOpen, onReady }: Props) {
   const invalidate = useThree((s) => s.invalidate);
 
   useEffect(() => {
@@ -126,7 +131,6 @@ export function Shelf({ books, camTarget, openingId, onOpen, onReady }: Props) {
     return () => cancelAnimationFrame(id);
   }, [camTarget, invalidate, onReady]);
 
-  // Dolly the camera in toward the book being pulled out.
   useFrame(() => {
     const t = camTarget.current;
     if (openingId) {
@@ -140,7 +144,7 @@ export function Shelf({ books, camTarget, openingId, onOpen, onReady }: Props) {
 
   const span = books.length * BOOK_T + (books.length - 1) * GAP;
   const x0 = -span / 2 + BOOK_T / 2;
-  const boardW = Math.max(span + 1.0, 2.6);
+  const boardW = Math.max(span + 1.1, 2.8);
   const bottom = -BOOK_H / 2;
 
   return (
@@ -151,17 +155,20 @@ export function Shelf({ books, camTarget, openingId, onOpen, onReady }: Props) {
           book={b}
           x={x0 + i * (BOOK_T + GAP)}
           opening={openingId === b.id}
+          selected={selectedId === b.id}
           onOpen={() => onOpen(b)}
         />
       ))}
 
+      {/* plank */}
       <mesh position={[0, bottom - 0.16, 0]}>
         <boxGeometry args={[boardW, 0.32, BOOK_D + 0.5]} />
         <meshStandardMaterial color={WOOD} roughness={0.85} />
       </mesh>
+      {/* back panel */}
       <mesh position={[0, 0, -BOOK_D / 2 - 0.12]}>
         <boxGeometry args={[boardW, BOOK_H + 0.7, 0.16]} />
-        <meshStandardMaterial color={WOOD} roughness={0.9} />
+        <meshStandardMaterial color={WOOD_DARK} roughness={0.9} />
       </mesh>
     </group>
   );
