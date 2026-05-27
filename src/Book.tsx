@@ -133,6 +133,13 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
     return () => window.clearTimeout(id);
   }, [page, invalidate]);
 
+  // Re-render on resize so the aspect-based reframing takes effect.
+  useEffect(() => {
+    const onResize = () => invalidate();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [invalidate]);
+
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     // Reduced motion: snap turns quickly and drop the ambient idle entirely.
@@ -187,7 +194,11 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
       group.current.rotation.x = -0.12;
     }
 
+    // Pull the camera back on narrow / portrait viewports so the book always fits.
+    const aspect = state.size.width / Math.max(1, state.size.height);
+    const fit = 1 + Math.max(0, 1.3 - aspect) * 1.15;
     camPos.current.lerpVectors(CAM_CLOSED, CAM_OPEN, eased);
+    camPos.current.z *= fit;
     lookAt.current.lerpVectors(LOOK_CLOSED, LOOK_OPEN, eased);
     camera.position.x = THREE.MathUtils.damp(camera.position.x, camPos.current.x, 5, dt);
     camera.position.y = THREE.MathUtils.damp(camera.position.y, camPos.current.y, 5, dt);
