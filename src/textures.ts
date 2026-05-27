@@ -11,7 +11,7 @@ const PAPER = "#faf6ec";
 const INK = "#2b2a26";
 const INK_SOFT = "#6b6354";
 
-const SERIF = "Georgia, 'Times New Roman', serif";
+const SERIF = "'EB Garamond', Georgia, 'Times New Roman', serif";
 
 // The opening of "Down the Rabbit-Hole" (Lewis Carroll, public domain).
 const ALICE_CH1 = [
