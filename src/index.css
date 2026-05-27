@@ -29,6 +29,20 @@ body {
   position: relative;
 }
 
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: #ece9e4;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+
+.loader--hidden {
+  opacity: 0;
+}
+
 .progress {
   position: absolute;
   left: 0;
@@ -130,7 +144,9 @@ canvas:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hint {
+  .hint,
+  .loader,
+  .progress__fill {
     transition: none;
   }
 }

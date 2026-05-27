@@ -7,6 +7,7 @@ import { Book } from "./Book";
 export default function App() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
+  const [ready, setReady] = useState(false);
 
   const next = useCallback(() => setPage((p) => (p >= total ? 0 : p + 1)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
@@ -58,6 +59,8 @@ export default function App() {
         Alice's Adventures in Wonderland — an interactive 3D book
       </h1>
 
+      <div className={`loader${ready ? " loader--hidden" : ""}`} aria-hidden="true" />
+
       <Canvas
         shadows={false}
         frameloop="demand"
@@ -71,6 +74,8 @@ export default function App() {
             "aria-label",
             "A 3D edition of Alice's Adventures in Wonderland. Click, tap, or press the arrow keys to turn the pages.",
           );
+          // Reveal once the first frame has actually painted.
+          requestAnimationFrame(() => requestAnimationFrame(() => setReady(true)));
         }}
       >
         <color attach="background" args={["#ece9e4"]} />
