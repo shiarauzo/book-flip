@@ -6,11 +6,22 @@ import { Book } from "./Book";
 export default function App() {
   return (
     <>
+      <h1 className="sr-only">
+        Alice's Adventures in Wonderland — an interactive 3D book
+      </h1>
       <Canvas
         shadows={false}
         dpr={[1, 2]}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         camera={{ position: [0.5, 0.7, 6.4], fov: 35 }}
+        onCreated={({ gl }) => {
+          const el = gl.domElement;
+          el.setAttribute("role", "application");
+          el.setAttribute(
+            "aria-label",
+            "A 3D edition of Alice's Adventures in Wonderland. Click, tap, or press the arrow keys to turn the pages.",
+          );
+        }}
       >
         <color attach="background" args={["#ece9e4"]} />
         <fog attach="fog" args={["#ece9e4", 9, 16]} />

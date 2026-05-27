@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { createBendMaterial, type BendUniforms } from "./bendMaterial";
 import { chapterPages, coverTexture, endTexture, titlePageTexture } from "./textures";
+import { useReducedMotion } from "./useReducedMotion";
 
 const PAGE_W = 2.2;
 const PAGE_H = 3.0;
@@ -33,6 +34,7 @@ type Leaf = {
 
 export function Book() {
   const { camera } = useThree();
+  const reduced = useReducedMotion();
 
   // One subdivided plane reused by every sheet; left edge sits on the spine (x=0).
   const geometry = useMemo(() => {
@@ -109,21 +111,23 @@ export function Book() {
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
+    // Reduced motion: snap turns quickly and drop the ambient idle entirely.
+    const turnLambda = reduced ? 16 : 5;
 
     // Each leaf eases toward turned (1) or not (0); only the one being flipped moves.
     for (let i = 0; i < leaves.length; i++) {
       const target = i < page ? 1 : 0;
-      progs.current[i] = THREE.MathUtils.damp(progs.current[i], target, 5, dt);
+      progs.current[i] = THREE.MathUtils.damp(progs.current[i], target, turnLambda, dt);
       leaves[i].uniforms.uProgress.value = progs.current[i];
     }
 
-    openness.current = THREE.MathUtils.damp(openness.current, page > 0 ? 1 : 0, 5, dt);
+    openness.current = THREE.MathUtils.damp(openness.current, page > 0 ? 1 : 0, turnLambda, dt);
     const eased = smoothstep(openness.current);
 
-    // Idle: gentle bob + sway that fades out once the book is open.
+    // Idle: gentle bob + sway that fades out once the book is open (off if reduced).
     if (group.current) {
       const t = state.clock.elapsedTime;
-      const idle = 1 - eased;
+      const idle = reduced ? 0 : 1 - eased;
       group.current.position.y = Math.sin(t * 0.9) * 0.04 * idle;
       group.current.rotation.y = -0.32 + Math.sin(t * 0.5) * 0.05 * idle;
       group.current.rotation.x = -0.12;
