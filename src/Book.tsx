@@ -122,6 +122,8 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
   const progs = useRef<number[]>(leaves.map(() => 0));
   const vels = useRef<number[]>(leaves.map(() => 0));
   const openness = useRef(0);
+  const hovered = useRef(false);
+  const hoverAmt = useRef(0);
   const lookAt = useRef(LOOK_CLOSED.clone());
   const camPos = useRef(CAM_CLOSED.clone());
 
@@ -170,13 +172,20 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
     openness.current = Math.abs(ov - oTarget) < EPS ? oTarget : ((busy = true), ov);
     const eased = THREE.MathUtils.smoothstep(openness.current, 0, 1);
 
+    // Hover affordance: while closed, the cover leans toward you, inviting a click.
+    const hoverTarget = hovered.current && page === 0 && !reduced ? 1 : 0;
+    hoverAmt.current = THREE.MathUtils.damp(hoverAmt.current, hoverTarget, 8, dt);
+    if (Math.abs(hoverAmt.current - hoverTarget) > EPS) busy = true;
+
     // Idle: gentle bob + sway that fades out once the book is open (off if reduced).
     if (group.current) {
       const t = state.clock.elapsedTime;
       const idle = reduced ? 0 : 1 - eased;
       if (idle > EPS) busy = true; // keep the loop alive while the sway breathes
       group.current.position.y = Math.sin(t * 0.9) * 0.04 * idle;
-      group.current.rotation.y = -0.32 + Math.sin(t * 0.5) * 0.05 * idle;
+      group.current.position.z = hoverAmt.current * 0.08;
+      group.current.rotation.y =
+        -0.32 + Math.sin(t * 0.5) * 0.05 * idle + hoverAmt.current * 0.14;
       group.current.rotation.x = -0.12;
     }
 
@@ -214,8 +223,16 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
           e.stopPropagation();
           onAdvance();
         }}
-        onPointerOver={() => setCursor("pointer")}
-        onPointerOut={() => setCursor("auto")}
+        onPointerOver={() => {
+          setCursor("pointer");
+          hovered.current = true;
+          invalidate();
+        }}
+        onPointerOut={() => {
+          setCursor("auto");
+          hovered.current = false;
+          invalidate();
+        }}
       >
         {/* page block — the physical bulk of paper, giving the book real
             thickness and a cream fore-edge. The hardcover overhangs it slightly. */}
