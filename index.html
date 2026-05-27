@@ -2,16 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1f4e46" />
+    <meta name="color-scheme" content="light dark" />
+
+    <title>Alice in Wonderland — a 3D book you can read</title>
     <meta
       name="description"
-      content="A 3D book that opens with a satisfying page-bend motion. WebGL / React Three Fiber."
+      content="A 3D edition of Lewis Carroll's Alice's Adventures in Wonderland. Click to turn each page, which lifts and curls like real paper. Built with WebGL and React Three Fiber."
     />
-    <title>book-flip — a 3D opening book</title>
+    <link rel="canonical" href="https://book-flip-six.vercel.app/" />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Alice in Wonderland — a 3D book you can read" />
+    <meta
+      property="og:description"
+      content="Click to turn each page of Alice's Adventures in Wonderland — every leaf lifts and curls like real paper. A WebGL piece."
+    />
+    <meta property="og:url" content="https://book-flip-six.vercel.app/" />
+    <meta property="og:image" content="https://book-flip-six.vercel.app/og.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>This 3D book needs JavaScript and WebGL to run.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
