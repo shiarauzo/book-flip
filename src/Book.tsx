@@ -45,7 +45,9 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
 
   // Page descriptors for the whole book (CPU-only). Textures are made on demand.
   const faces = useMemo<PageDesc[]>(() => layoutBook(), []);
-  const sheets = Math.ceil(faces.length / 2);
+  // faces.length is odd by construction; the final spread (page = sheets) shows
+  // the last page on the left and "The End" on the right.
+  const sheets = (faces.length - 1) / 2;
 
   useEffect(() => onTotal(sheets), [sheets, onTotal]);
 
@@ -184,7 +186,7 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
     else busy = true;
     displayed.current = d;
 
-    const f = Math.min(Math.floor(d + 1e-4), sheets - 1);
+    const f = Math.floor(d + 1e-4);
     const frac = THREE.MathUtils.clamp(d - f, 0, 1);
     const flipping = frac > EPS && frac < 1 - EPS;
 
@@ -227,10 +229,14 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
       const t = state.clock.elapsedTime;
       const idle = reduced ? 0 : 1 - eased;
       if (idle > EPS) busy = true;
+      // The closed cover sits at a 3D angle; the open book eases to nearly
+      // face-on and centred so both pages read flat and symmetric.
+      const baseY = THREE.MathUtils.lerp(-0.32, -0.015, eased);
+      const baseX = THREE.MathUtils.lerp(-0.12, -0.05, eased);
       group.current.position.y = Math.sin(t * 0.9) * 0.04 * idle;
       group.current.position.z = hoverAmt.current * 0.08;
-      group.current.rotation.y = -0.32 + Math.sin(t * 0.5) * 0.05 * idle + hoverAmt.current * 0.14;
-      group.current.rotation.x = -0.12;
+      group.current.rotation.y = baseY + Math.sin(t * 0.5) * 0.05 * idle + hoverAmt.current * 0.14;
+      group.current.rotation.x = baseX;
     }
 
     const aspect = state.size.width / Math.max(1, state.size.height);
