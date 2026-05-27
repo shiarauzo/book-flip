@@ -1,3 +1,19 @@
+/* Self-hosted EB Garamond (latin) — no external request, no FOUT. */
+@font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/ebgaramond-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "EB Garamond";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ebgaramond-italic-latin.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light;
   --bg: #ece9e4;

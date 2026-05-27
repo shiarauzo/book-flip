@@ -83,7 +83,7 @@ export function createBendMaterial(
       `#include <beginnormal_vertex>
       {
         float nu = position.x / uWidth;
-        float nB = sin(uProgress * BEND_PI) * uBend;
+        float nB = sin(clamp(uProgress, 0.0, 1.0) * BEND_PI) * uBend;
         float ndz = cos(nu * BEND_PI) * BEND_PI / uWidth * nB;
         vec3 nN = normalize(vec3(-ndz, 0.0, 1.0));
         float nflip = uProgress * BEND_PI;
@@ -99,7 +99,9 @@ export function createBendMaterial(
       `#include <begin_vertex>
       {
         float bu = transformed.x / uWidth;
-        float bow = sin(bu * BEND_PI) * sin(uProgress * BEND_PI) * uBend;
+        // The flip rotation may overshoot past 1 for the flick; the bow must not
+        // (clamped) so the paper never reverse-curls at the extremes.
+        float bow = sin(bu * BEND_PI) * sin(clamp(uProgress, 0.0, 1.0) * BEND_PI) * uBend;
         transformed.z += bow + uStackZ;
         float bflip = uProgress * BEND_PI;
         float bc = cos(bflip);

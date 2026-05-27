@@ -27,6 +27,71 @@ type Leaf = {
   uniforms: BendUniforms;
 };
 
+type Built = {
+  geometry: THREE.PlaneGeometry;
+  leaves: Leaf[];
+  backMat: THREE.MeshStandardMaterial;
+};
+
+// Build the whole book (geometry + leaves + back cover) outside React so it can be
+// created once and disposed deterministically. Reading order of faces:
+//   cover · title page · chapter pages… (padded to an even count). Each leaf is a
+// sheet with a front (even face) and back (odd face); the back texture is flipped
+// in U so it reads correctly once the sheet has turned.
+function buildBook(): Built {
+  const geometry = new THREE.PlaneGeometry(PAGE_W, PAGE_H, 48, 2);
+  geometry.translate(PAGE_W / 2, 0, 0);
+
+  const faces: THREE.Texture[] = [coverTexture(), titlePageTexture(), ...chapterPages()];
+  if (faces.length % 2 !== 0) faces.push(endTexture());
+
+  const leaves: Leaf[] = [];
+  for (let i = 0; i < faces.length; i += 2) {
+    const li = i / 2;
+    const isCover = li === 0;
+    const front = createBendMaterial({
+      map: faces[i],
+      bend: isCover ? 0.1 : 0.5,
+      width: PAGE_W,
+      side: THREE.FrontSide,
+      stackZ: STACK_Z0 - li * STACK_DZ,
+      roughness: isCover ? 0.55 : 0.9,
+    });
+
+    const backTex = faces[i + 1];
+    backTex.wrapS = THREE.RepeatWrapping;
+    backTex.repeat.x = -1;
+    backTex.offset.x = 1;
+    const back = createBendMaterial({
+      map: backTex,
+      side: THREE.BackSide,
+      roughness: 0.9,
+      uniforms: front.uniforms, // share so both faces bend as one sheet
+    });
+
+    leaves.push({ frontMat: front.material, backMat: back.material, uniforms: front.uniforms });
+  }
+
+  const backMat = new THREE.MeshStandardMaterial({
+    color: COVER_BACK,
+    roughness: 0.85,
+    side: THREE.FrontSide,
+  });
+
+  return { geometry, leaves, backMat };
+}
+
+function disposeBook(b: Built) {
+  b.geometry.dispose();
+  b.backMat.dispose();
+  for (const lf of b.leaves) {
+    (lf.frontMat as THREE.MeshStandardMaterial).map?.dispose();
+    (lf.backMat as THREE.MeshStandardMaterial).map?.dispose();
+    lf.frontMat.dispose();
+    lf.backMat.dispose();
+  }
+}
+
 type BookProps = {
   page: number;
   onTotal: (total: number) => void;
@@ -39,66 +104,14 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
   const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
 
-  // One subdivided plane reused by every sheet; left edge sits on the spine (x=0).
-  const geometry = useMemo(() => {
-    const g = new THREE.PlaneGeometry(PAGE_W, PAGE_H, 48, 2);
-    g.translate(PAGE_W / 2, 0, 0);
-    return g;
+  // Build once. The ref lets us dispose the set discarded by React StrictMode's
+  // double-invoked render (dev only), so no GPU resource ever leaks.
+  const builtRef = useRef<Built | null>(null);
+  const { geometry, leaves, backMat } = useMemo(() => {
+    if (builtRef.current) disposeBook(builtRef.current);
+    builtRef.current = buildBook();
+    return builtRef.current;
   }, []);
-
-  // Build the book as a stack of leaves. Reading order of faces:
-  //   cover · title page · chapter pages… (padded to an even count).
-  // Each leaf is a sheet with a front (even face) and a back (odd face). The back
-  // texture is flipped in U so it reads correctly once the sheet has turned.
-  const leaves = useMemo<Leaf[]>(() => {
-    const faces: THREE.Texture[] = [
-      coverTexture(),
-      titlePageTexture(),
-      ...chapterPages(),
-    ];
-    if (faces.length % 2 !== 0) faces.push(endTexture());
-
-    const out: Leaf[] = [];
-    for (let i = 0; i < faces.length; i += 2) {
-      const li = i / 2;
-      const isCover = li === 0;
-      const bend = isCover ? 0.1 : 0.5;
-      const stackZ = STACK_Z0 - li * STACK_DZ;
-
-      const front = createBendMaterial({
-        map: faces[i],
-        bend,
-        width: PAGE_W,
-        side: THREE.FrontSide,
-        stackZ,
-        roughness: isCover ? 0.55 : 0.9,
-      });
-
-      const backTex = faces[i + 1];
-      backTex.wrapS = THREE.RepeatWrapping;
-      backTex.repeat.x = -1;
-      backTex.offset.x = 1;
-      const back = createBendMaterial({
-        map: backTex,
-        side: THREE.BackSide,
-        roughness: 0.9,
-        uniforms: front.uniforms, // share so both faces bend as one sheet
-      });
-
-      out.push({ frontMat: front.material, backMat: back.material, uniforms: front.uniforms });
-    }
-    return out;
-  }, []);
-
-  const backMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: COVER_BACK,
-        roughness: 0.85,
-        side: THREE.FrontSide,
-      }),
-    [],
-  );
 
   // Report leaf count up so the parent can drive page state, bounds and the UI.
   useEffect(() => onTotal(leaves.length), [leaves, onTotal]);
@@ -110,19 +123,12 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
     return () => cancelAnimationFrame(id);
   }, [onReady]);
 
-  // Release every GPU resource on unmount (textures, materials, geometry).
+  // Release every GPU resource on unmount.
   useEffect(() => {
     return () => {
-      geometry.dispose();
-      backMat.dispose();
-      for (const lf of leaves) {
-        (lf.frontMat as THREE.MeshStandardMaterial).map?.dispose();
-        (lf.backMat as THREE.MeshStandardMaterial).map?.dispose();
-        lf.frontMat.dispose();
-        lf.backMat.dispose();
-      }
+      if (builtRef.current) disposeBook(builtRef.current);
     };
-  }, [geometry, backMat, leaves]);
+  }, []);
 
   const group = useRef<THREE.Group>(null);
   const progs = useRef<number[]>(leaves.map(() => 0));
