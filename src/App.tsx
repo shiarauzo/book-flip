@@ -2,16 +2,22 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
-import { Book } from "./Book";
+import { Book, type ChapterMark } from "./Book";
 
 export default function App() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [ready, setReady] = useState(false);
+  const [chapters, setChapters] = useState<ChapterMark[]>([]);
+  const [toc, setToc] = useState(false);
 
   const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
   const turn = useCallback((dir: 1 | -1) => (dir < 0 ? prev() : next()), [prev, next]);
+  const jumpTo = useCallback((p: number) => {
+    setPage(p);
+    setToc(false);
+  }, []);
 
   // Safety net: reveal even if the environment map never resolves.
   useEffect(() => {
@@ -19,7 +25,7 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, []);
 
-  // Keyboard: arrows / space / page keys / home / end.
+  // Keyboard: arrows / space / page keys / home / end / escape.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -43,6 +49,9 @@ export default function App() {
         case "End":
           e.preventDefault();
           setPage(total);
+          break;
+        case "Escape":
+          setToc(false);
           break;
       }
     };
@@ -83,8 +92,6 @@ export default function App() {
           );
         }}
       >
-        {/* Transparent canvas — the warm radial background lives in CSS (one source).
-            Stylized lighting: warm key, cool fill, soft ambient. */}
         <ambientLight intensity={0.55} />
         <directionalLight position={[3, 5, 4]} intensity={1.5} color="#fff4e2" />
         <directionalLight position={[-4, 2, -2]} intensity={0.45} color="#dfe8ff" />
@@ -92,11 +99,12 @@ export default function App() {
         <Suspense fallback={null}>
           <Environment preset="apartment" />
           <Book
-          page={page}
-          onTotal={setTotal}
-          onTurn={turn}
-          onReady={() => setReady(true)}
-        />
+            page={page}
+            onTotal={setTotal}
+            onTurn={turn}
+            onReady={() => setReady(true)}
+            onChapters={setChapters}
+          />
         </Suspense>
 
         <ContactShadows
@@ -112,6 +120,41 @@ export default function App() {
       <div className="sr-only" role="status" aria-live="polite">
         {announce}
       </div>
+
+      {/* Table of contents */}
+      <button
+        type="button"
+        className="toc-toggle"
+        aria-expanded={toc}
+        aria-controls="toc-panel"
+        onClick={() => setToc((o) => !o)}
+      >
+        {toc ? "Close" : "Contents"}
+      </button>
+
+      {toc && (
+        <>
+          <div className="toc-scrim" onClick={() => setToc(false)} aria-hidden="true" />
+          <nav id="toc-panel" className="toc" aria-label="Table of contents">
+            <p className="toc__head">Contents</p>
+            <button type="button" className="toc__item" onClick={() => jumpTo(0)}>
+              <span className="toc__num">—</span>
+              <span className="toc__title">Cover</span>
+            </button>
+            {chapters.map((c) => (
+              <button
+                type="button"
+                className="toc__item"
+                key={c.roman}
+                onClick={() => jumpTo(c.page)}
+              >
+                <span className="toc__num">{c.roman}</span>
+                <span className="toc__title">{c.title}</span>
+              </button>
+            ))}
+          </nav>
+        </>
+      )}
 
       <div
         className="progress"
