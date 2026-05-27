@@ -270,11 +270,17 @@ body {
   user-select: none;
 }
 
-.reset-btn {
+.top-actions {
   position: absolute;
   top: 22px;
-  right: 150px;
+  right: 22px;
   z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reset-btn {
   padding: 9px 16px;
   border-radius: 22px;
   border: 1px solid rgba(31, 78, 70, 0.3);
@@ -302,10 +308,6 @@ body {
 }
 
 .upload-btn {
-  position: absolute;
-  top: 22px;
-  right: 22px;
-  z-index: 6;
   padding: 9px 18px;
   border-radius: 22px;
   border: 1px solid rgba(31, 78, 70, 0.3);
@@ -510,10 +512,65 @@ canvas:focus-visible {
   border-radius: 4px;
 }
 
+/* Rotate-to-landscape prompt — only on small portrait screens. */
+.rotate-hint {
+  display: none;
+}
+
+.rotate-hint__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: #1f4e46;
+  font: 400 22px/1.4 "EB Garamond", Georgia, serif;
+  text-align: center;
+  padding: 0 32px;
+}
+
+.rotate-hint__icon {
+  font-size: 46px;
+  animation: rotate-nudge 2s ease-in-out infinite;
+}
+
+@keyframes rotate-nudge {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  80% {
+    transform: rotate(90deg);
+  }
+}
+
+/* Phones (narrow portrait OR short landscape): hide the page arrows — tap the
+   left/right half of the book to turn instead. */
+@media (max-width: 640px), (max-height: 480px) {
+  .nav-btn {
+    display: none;
+  }
+}
+
+/* Phones held upright: cover the cramped portrait view and ask to rotate. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .rotate-hint {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(120% 105% at 50% 30%, #e0d8c7 0%, #c3bba6 60%, #a89f88 100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hint,
   .loader,
   .progress__fill {
     transition: none;
+  }
+  .rotate-hint__icon {
+    animation: none;
   }
 }
