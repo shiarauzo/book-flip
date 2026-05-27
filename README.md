@@ -38,8 +38,24 @@ lands on top of the left pile, like a real book. A subtle idle bob + sway fades
 out once open, and the camera does a small push-in / reframe.
 
 Clicks are caught by both the book and an invisible backdrop plane, because the
-GPU-side vertex bend is invisible to the CPU raycaster — so hit-testing the
-curled page can't be trusted; any click simply advances.
+GPU-side vertex bend is invisible to the CPU raycaster. Direction comes from the
+pointer's screen half — left turns back, right turns forward — so hit-testing the
+curled geometry is never needed.
+
+## Craft & accessibility
+
+- **Keyboard**: arrows / space / page-up·down / home / end turn pages; an
+  `aria-live` region announces each spread and a `progressbar` tracks position.
+- **`prefers-reduced-motion`**: drops the idle sway and snaps page turns.
+- **On-demand rendering**: `frameloop="demand"` — the loop invalidates only while
+  something is moving and snaps to rest, so the GPU sleeps while you read.
+- **Resource hygiene**: every texture, material and geometry is disposed on unmount.
+- **Typography**: pages are set in EB Garamond (preloaded before the canvas paints)
+  with a raised drop-cap opening Chapter I.
+- **Material detail**: linen-weave hardcover, paper grain + inner vignette on the
+  leaves, a real page-block fore-edge, and an engraved pocket-watch frontispiece.
+- **Responsive**: the camera reframes by aspect ratio for portrait / mobile, with
+  a gentle load fade-in and safe-area-aware controls.
 
 ## Run locally
 
@@ -63,10 +79,5 @@ Everything that defines the motion lives in a few constants:
 ## Roadmap (v2 ideas)
 
 - Drag-to-flip: the same `uProgress`, driven by the pointer instead of a tween.
-- Click left/right to go back/forward (needs a separate flat hit-collider per
-  leaf, since the curled geometry can't be raycast).
-- More chapters; responsive / mobile tuning (lower subdivision + dpr on small screens).
-
----
-
-🤖 Scaffolded with [Claude Code](https://claude.com/claude-code)
+- A gentle page-turn sound (after the first user gesture).
+- More chapters and Tenniel plates; lazy-generate page textures as you approach them.
