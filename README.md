@@ -1,10 +1,17 @@
 # book-flip
 
-A 3D book that opens with a satisfying page-bend motion. Click the cover and it
-swings open — the front cover lifts with weight, the first page trails behind it
-and curls like real paper. Click again to close. The motion *is* the project.
+A 3D edition of *Alice's Adventures in Wonderland* that opens with a satisfying
+page-bend motion. Click the cover and it swings open — the front cover lifts
+with weight, the first page trails behind it and curls like real paper,
+revealing the title page on the left and Chapter I on the right. Click again to
+close.
 
 Built with **React Three Fiber + drei + Vite**. Desktop-first.
+
+The page content (cover, title page, chapter text) is drawn to `<canvas>` and
+mapped onto the sheets as textures — see [`src/textures.ts`](src/textures.ts).
+The text is the opening of "Down the Rabbit-Hole" from Lewis Carroll's
+public-domain original.
 
 ## How the motion works
 

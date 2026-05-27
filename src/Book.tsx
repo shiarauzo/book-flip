@@ -2,6 +2,7 @@ import { useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { createBendMaterial } from "./bendMaterial";
+import { chapterTexture, coverTexture, titlePageTexture } from "./textures";
 
 const PAGE_W = 2.2;
 const PAGE_H = 3.0;
@@ -9,8 +10,7 @@ const PAGE_H = 3.0;
 // Palette — stylized clean: deep teal hardcover on warm cream pages.
 const COVER = "#1f4e46";
 const COVER_BACK = "#173f39";
-const CREAM = "#f7f4ee";
-const CREAM_DEEP = "#efe9df";
+const PAPER = "#faf6ec";
 
 // Camera framing: closed (right-weighted) -> open (pushed in, shifted left).
 const CAM_CLOSED = new THREE.Vector3(0.5, 0.7, 6.4);
@@ -33,14 +33,56 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
     return g;
   }, []);
 
-  // The cover is almost rigid (tiny flex); the page bows like real paper.
-  const cover = useMemo(
-    () => createBendMaterial({ color: COVER, bend: 0.06, width: PAGE_W }),
+  // Front cover (almost rigid): title on the outer face, clean endpaper on the
+  // inside. stackZ lives in the shader so the flip puts the open cover *under*
+  // the turned page, like a real book.
+  const coverFront = useMemo(
+    () =>
+      createBendMaterial({
+        bend: 0.06,
+        width: PAGE_W,
+        map: coverTexture(),
+        roughness: 0.55,
+        side: THREE.FrontSide,
+        stackZ: 0.06,
+      }),
     [],
   );
-  const page = useMemo(
-    () => createBendMaterial({ color: CREAM, bend: 0.55, width: PAGE_W }),
+  const coverBack = useMemo(
+    () =>
+      createBendMaterial({
+        color: COVER_BACK,
+        bend: 0.06,
+        width: PAGE_W,
+        side: THREE.BackSide,
+        uniforms: coverFront.uniforms,
+      }),
+    [coverFront],
+  );
+
+  // The first page bows like real paper: blank front, inner title page on its
+  // back (the left page of the open spread). Both halves share one uniforms set.
+  const pageFront = useMemo(
+    () =>
+      createBendMaterial({
+        color: PAPER,
+        bend: 0.55,
+        width: PAGE_W,
+        side: THREE.FrontSide,
+        stackZ: 0.04,
+      }),
     [],
+  );
+  const pageBack = useMemo(
+    () =>
+      createBendMaterial({
+        bend: 0.55,
+        width: PAGE_W,
+        map: titlePageTexture(),
+        side: THREE.BackSide,
+        uniforms: pageFront.uniforms,
+      }),
+    [pageFront],
   );
 
   // Static sheets revealed once the cover swings away.
@@ -53,12 +95,12 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
       }),
     [],
   );
-  const blockMat = useMemo(
+  const chapterMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: CREAM_DEEP,
+        map: chapterTexture(),
         roughness: 0.9,
-        side: THREE.DoubleSide,
+        side: THREE.FrontSide,
       }),
     [],
   );
@@ -81,8 +123,8 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
       3,
       dt,
     );
-    cover.uniforms.uProgress.value = coverProg.current;
-    page.uniforms.uProgress.value = pageProg.current;
+    coverFront.uniforms.uProgress.value = coverProg.current;
+    pageFront.uniforms.uProgress.value = pageProg.current;
 
     const eased = smoothstep(coverProg.current);
 
@@ -120,13 +162,15 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
     >
       {/* back cover (static) */}
       <mesh geometry={geometry} material={backMat} position={[0, 0, 0]} />
-      {/* inner page block (static, revealed on open) */}
-      <mesh geometry={geometry} material={blockMat} position={[0, 0, 0.012]} />
-      <mesh geometry={geometry} material={blockMat} position={[0, 0, 0.024]} />
-      {/* first page (bends, trails the cover) */}
-      <mesh geometry={geometry} material={page.material} position={[0, 0, 0.04]} />
-      {/* front cover (almost rigid, leads) */}
-      <mesh geometry={geometry} material={cover.material} position={[0, 0, 0.06]} />
+      {/* chapter page — the right side of the open spread (static) */}
+      <mesh geometry={geometry} material={chapterMat} position={[0, 0, 0.024]} />
+      {/* first page (bends, trails the cover): blank front + title page on back.
+          stackZ lives in the shader, so no position offset here. */}
+      <mesh geometry={geometry} material={pageFront.material} />
+      <mesh geometry={geometry} material={pageBack.material} />
+      {/* front cover (almost rigid, leads): title front + endpaper back */}
+      <mesh geometry={geometry} material={coverFront.material} />
+      <mesh geometry={geometry} material={coverBack.material} />
       {/* spine */}
       <mesh position={[0, 0, 0.03]}>
         <boxGeometry args={[0.05, PAGE_H, 0.075]} />

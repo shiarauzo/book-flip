@@ -4,13 +4,21 @@ export type BendUniforms = {
   uProgress: { value: number };
   uBend: { value: number };
   uWidth: { value: number };
+  uStackZ: { value: number };
 };
 
 type Options = {
-  color: THREE.ColorRepresentation;
+  color?: THREE.ColorRepresentation;
   bend?: number;
   width: number;
   roughness?: number;
+  map?: THREE.Texture;
+  side?: THREE.Side;
+  /** Stacking offset toward the camera. Lives inside the shader (before the flip)
+   * so the flip inverts the stack order — the opened cover ends up under the page. */
+  stackZ?: number;
+  /** Reuse an existing uniforms object so two meshes (front/back of one sheet) bend together. */
+  uniforms?: BendUniforms;
 };
 
 const PI = "3.141592653589793";
@@ -27,31 +35,38 @@ const PI = "3.141592653589793";
  * `uBend` controls how much the sheet bows out of plane mid-flip (the paper curl).
  */
 export function createBendMaterial({
-  color,
+  color = "#ffffff",
   bend = 0.0,
   width,
   roughness = 0.85,
+  map,
+  side = THREE.DoubleSide,
+  stackZ = 0,
+  uniforms: shared,
 }: Options): { material: THREE.MeshStandardMaterial; uniforms: BendUniforms } {
-  const uniforms: BendUniforms = {
+  const uniforms: BendUniforms = shared ?? {
     uProgress: { value: 0 },
     uBend: { value: bend },
     uWidth: { value: width },
+    uStackZ: { value: stackZ },
   };
 
   const material = new THREE.MeshStandardMaterial({
     color,
     roughness,
     metalness: 0,
-    side: THREE.DoubleSide,
+    side,
+    ...(map ? { map } : {}),
   });
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uProgress = uniforms.uProgress;
     shader.uniforms.uBend = uniforms.uBend;
     shader.uniforms.uWidth = uniforms.uWidth;
+    shader.uniforms.uStackZ = uniforms.uStackZ;
 
     shader.vertexShader =
-      "uniform float uProgress;\nuniform float uBend;\nuniform float uWidth;\n" +
+      "uniform float uProgress;\nuniform float uBend;\nuniform float uWidth;\nuniform float uStackZ;\n" +
       shader.vertexShader;
 
     // Tilt the normal to match the bow + flip so lighting stays correct.
@@ -77,7 +92,7 @@ export function createBendMaterial({
       {
         float bu = transformed.x / uWidth;
         float bow = sin(bu * ${PI}) * sin(uProgress * ${PI}) * uBend;
-        transformed.z += bow;
+        transformed.z += bow + uStackZ;
         float bflip = uProgress * ${PI};
         float bc = cos(bflip);
         float bs = sin(bflip);
