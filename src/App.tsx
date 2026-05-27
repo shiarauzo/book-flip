@@ -23,6 +23,7 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [loadingLabel, setLoadingLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   const loadPdf = useCallback(
     async (file: File) => {
@@ -65,6 +66,33 @@ export default function App() {
   }, [alice]);
 
   const isPdf = source !== alice;
+
+  // Drop a PDF anywhere on the page to open it.
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const onOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      setDragging(true);
+    };
+    const onLeave = (e: DragEvent) => {
+      if (e.relatedTarget === null) setDragging(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) loadPdf(file);
+    };
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [loadPdf]);
 
   const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
@@ -191,6 +219,12 @@ export default function App() {
       {busy && <LoadingOverlay label={loadingLabel} progress={progress} />}
 
       {error && <ErrorToast message={error} onClose={() => setError(null)} />}
+
+      {dragging && (
+        <div className="dropzone" aria-hidden="true">
+          <div className="dropzone__inner">Drop your PDF to read it</div>
+        </div>
+      )}
 
       {/* Table of contents — only when this book exposes chapters/bookmarks */}
       {chapters.length > 0 && (
