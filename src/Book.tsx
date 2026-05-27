@@ -17,11 +17,14 @@ const CAM_OPEN = new THREE.Vector3(0.05, 0.55, 6.85);
 const LOOK_CLOSED = new THREE.Vector3(0.5, 0.0, 0.0);
 const LOOK_OPEN = new THREE.Vector3(0.05, 0.0, 0.0);
 
+export type ChapterMark = { roman: string; title: string; page: number };
+
 type BookProps = {
   page: number;
   onTotal: (total: number) => void;
   onTurn: (dir: 1 | -1) => void;
   onReady: () => void;
+  onChapters: (chapters: ChapterMark[]) => void;
 };
 
 function blankTexture(): THREE.CanvasTexture {
@@ -35,7 +38,7 @@ function blankTexture(): THREE.CanvasTexture {
   return t;
 }
 
-export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
+export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) {
   const { camera } = useThree();
   const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
@@ -45,6 +48,18 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
   const sheets = Math.ceil(faces.length / 2);
 
   useEffect(() => onTotal(sheets), [sheets, onTotal]);
+
+  // Each chapter's opening page → the spread (page index) that reveals it.
+  const chapters = useMemo<ChapterMark[]>(() => {
+    const out: ChapterMark[] = [];
+    faces.forEach((f, i) => {
+      if (f.kind === "content" && f.heading) {
+        out.push({ roman: f.heading.roman, title: f.heading.title, page: Math.ceil(i / 2) });
+      }
+    });
+    return out;
+  }, [faces]);
+  useEffect(() => onChapters(chapters), [chapters, onChapters]);
 
   // Geometry: right page (x:0..W), left page (x:-W..0), and a back-face geometry
   // with flipped U so the turning sheet's back reads correctly without mirroring
