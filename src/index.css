@@ -1,5 +1,22 @@
+/* Self-hosted EB Garamond (latin) — no external request, no FOUT. */
+@font-face {
+  font-family: "EB Garamond";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/ebgaramond-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "EB Garamond";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ebgaramond-italic-latin.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light;
+  --bg: #ece9e4;
 }
 
 * {
@@ -22,23 +39,131 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
-  background: #ece9e4;
+  background: radial-gradient(125% 105% at 50% 32%, #f3efe7 0%, #e7e1d5 55%, #dcd4c5 100%);
 }
 
 #root {
   position: relative;
 }
 
-.hint {
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: #ece9e4;
+  opacity: 1;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+
+.loader--hidden {
+  opacity: 0;
+}
+
+.progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(31, 78, 70, 0.12);
+}
+
+.progress__fill {
+  height: 100%;
+  background: #1f4e46;
+  transform-origin: left center;
+  transition: transform 0.55s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.controls {
   position: absolute;
   left: 50%;
-  bottom: 32px;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hint {
+  margin: 0;
+  min-width: 168px;
+  text-align: center;
+  color: #5c5346;
   font-size: 13px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  pointer-events: none;
   user-select: none;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.5s ease;
+}
+
+.nav-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(31, 78, 70, 0.25);
+  background: rgba(255, 255, 255, 0.55);
+  color: #1f4e46;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition:
+    transform 0.16s ease,
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.nav-btn:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.nav-btn:active {
+  transform: translateY(0);
+}
+
+.nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.nav-btn:focus-visible {
+  outline: 2px solid #1f4e46;
+  outline-offset: 2px;
+}
+
+/* Visible only to assistive tech. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+canvas:focus {
+  outline: none;
+}
+
+canvas:focus-visible {
+  outline: 2px solid #1f4e46;
+  outline-offset: -3px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint,
+  .loader,
+  .progress__fill {
+    transition: none;
+  }
 }
