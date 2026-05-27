@@ -1,5 +1,5 @@
-import { type MutableRefObject, useEffect, useMemo } from "react";
-import { useThree } from "@react-three/fiber";
+import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CamTarget } from "../CameraRig";
 import { spineTexture } from "./spineTexture";
@@ -19,13 +19,30 @@ const WOOD = "#6b4a32";
 
 const SHELF_POS = new THREE.Vector3(0, 0, 6.5);
 const SHELF_LOOK = new THREE.Vector3(0, 0, 0);
+// Where the camera eases to as a book is pulled out (matches reading-closed framing).
+const PRESENT_POS = new THREE.Vector3(0.2, 0.3, 6.0);
+const PRESENT_LOOK = new THREE.Vector3(0.1, 0, 0);
 
 function setCursor(c: string) {
   document.body.style.cursor = c;
 }
 
-function SpineBook({ book, x, onOpen }: { book: ShelfBook; x: number; onOpen: () => void }) {
-  // Six box materials; the +z face (index 4) carries the spine art.
+function SpineBook({
+  book,
+  x,
+  opening,
+  onOpen,
+}: {
+  book: ShelfBook;
+  x: number;
+  opening: boolean;
+  onOpen: () => void;
+}) {
+  const invalidate = useThree((s) => s.invalidate);
+  const mesh = useRef<THREE.Mesh>(null);
+  const hover = useRef(0);
+  const pull = useRef(0);
+
   const materials = useMemo(() => {
     const side = new THREE.MeshStandardMaterial({ color: book.spineBg ?? "#1f4e46", roughness: 0.7 });
     const spine = new THREE.MeshStandardMaterial({
@@ -44,16 +61,46 @@ function SpineBook({ book, x, onOpen }: { book: ShelfBook; x: number; onOpen: ()
     [materials],
   );
 
+  useFrame((_, delta) => {
+    const m = mesh.current;
+    if (!m) return;
+    const dt = Math.min(delta, 1 / 30);
+    let busy = false;
+
+    // Pull the chosen book out and tip it toward the reader; others stay put.
+    const pullT = opening ? 1 : 0;
+    pull.current = THREE.MathUtils.damp(pull.current, pullT, 7, dt);
+    if (Math.abs(pull.current - pullT) > 1e-3) busy = true;
+
+    const hv = !opening && hover.current > 0 ? hover.current : 0;
+
+    m.position.set(x, pull.current * 0.45 + hv * 0.12, pull.current * 1.8 + hv * 0.35);
+    m.rotation.y = pull.current * -0.5;
+    const s = 1 + pull.current * 0.04;
+    m.scale.setScalar(s);
+
+    if (busy) invalidate();
+  });
+
   return (
     <mesh
+      ref={mesh}
       position={[x, 0, 0]}
       material={materials}
       onClick={(e) => {
         e.stopPropagation();
         onOpen();
       }}
-      onPointerOver={() => setCursor("pointer")}
-      onPointerOut={() => setCursor("auto")}
+      onPointerOver={() => {
+        setCursor("pointer");
+        hover.current = 1;
+        invalidate();
+      }}
+      onPointerOut={() => {
+        setCursor("auto");
+        hover.current = 0;
+        invalidate();
+      }}
     >
       <boxGeometry args={[BOOK_T, BOOK_H, BOOK_D]} />
     </mesh>
@@ -63,14 +110,14 @@ function SpineBook({ book, x, onOpen }: { book: ShelfBook; x: number; onOpen: ()
 type Props = {
   books: ShelfBook[];
   camTarget: MutableRefObject<CamTarget>;
+  openingId: string | null;
   onOpen: (book: ShelfBook) => void;
   onReady: () => void;
 };
 
-export function Shelf({ books, camTarget, onOpen, onReady }: Props) {
+export function Shelf({ books, camTarget, openingId, onOpen, onReady }: Props) {
   const invalidate = useThree((s) => s.invalidate);
 
-  // Frame the camera on the shelf and reveal once painted.
   useEffect(() => {
     camTarget.current.pos.copy(SHELF_POS);
     camTarget.current.look.copy(SHELF_LOOK);
@@ -78,6 +125,18 @@ export function Shelf({ books, camTarget, onOpen, onReady }: Props) {
     const id = requestAnimationFrame(() => requestAnimationFrame(onReady));
     return () => cancelAnimationFrame(id);
   }, [camTarget, invalidate, onReady]);
+
+  // Dolly the camera in toward the book being pulled out.
+  useFrame(() => {
+    const t = camTarget.current;
+    if (openingId) {
+      t.pos.copy(PRESENT_POS);
+      t.look.copy(PRESENT_LOOK);
+    } else {
+      t.pos.copy(SHELF_POS);
+      t.look.copy(SHELF_LOOK);
+    }
+  });
 
   const span = books.length * BOOK_T + (books.length - 1) * GAP;
   const x0 = -span / 2 + BOOK_T / 2;
@@ -87,15 +146,19 @@ export function Shelf({ books, camTarget, onOpen, onReady }: Props) {
   return (
     <group>
       {books.map((b, i) => (
-        <SpineBook key={b.id} book={b} x={x0 + i * (BOOK_T + GAP)} onOpen={() => onOpen(b)} />
+        <SpineBook
+          key={b.id}
+          book={b}
+          x={x0 + i * (BOOK_T + GAP)}
+          opening={openingId === b.id}
+          onOpen={() => onOpen(b)}
+        />
       ))}
 
-      {/* shelf plank */}
       <mesh position={[0, bottom - 0.16, 0]}>
         <boxGeometry args={[boardW, 0.32, BOOK_D + 0.5]} />
         <meshStandardMaterial color={WOOD} roughness={0.85} />
       </mesh>
-      {/* back panel */}
       <mesh position={[0, 0, -BOOK_D / 2 - 0.12]}>
         <boxGeometry args={[boardW, BOOK_H + 0.7, 0.16]} />
         <meshStandardMaterial color={WOOD} roughness={0.9} />

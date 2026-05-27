@@ -117,6 +117,26 @@ body {
   letter-spacing: 0.04em;
 }
 
+.fade {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: radial-gradient(120% 105% at 50% 30%, #d8cfbc 0%, #b9ad95 55%, #97896f 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.fade--on {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade {
+    transition-duration: 0.12s;
+  }
+}
+
 .toast {
   position: absolute;
   left: 50%;
