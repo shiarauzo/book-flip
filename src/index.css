@@ -39,7 +39,7 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
-  background: radial-gradient(125% 105% at 50% 32%, #f3efe7 0%, #e7e1d5 55%, #dcd4c5 100%);
+  background: radial-gradient(120% 105% at 50% 30%, #d8cfbc 0%, #b9ad95 55%, #97896f 100%);
 }
 
 #root {
@@ -50,7 +50,7 @@ body {
   position: absolute;
   inset: 0;
   z-index: 10;
-  background: #ece9e4;
+  background: radial-gradient(120% 105% at 50% 30%, #d8cfbc 0%, #b9ad95 55%, #97896f 100%);
   opacity: 1;
   pointer-events: none;
   transition: opacity 0.9s ease;

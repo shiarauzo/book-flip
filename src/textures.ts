@@ -24,6 +24,12 @@ const ALICE_CH1 = [
   "Down, down, down. Would the fall never come to an end? “I wonder how many miles I’ve fallen by this time?” she said aloud. “I must be getting somewhere near the centre of the earth. Let me see: that would be four thousand miles down, I think—”",
   "“—yes, that’s about the right distance—but then I wonder what Latitude or Longitude I’ve got to?” (Alice had not the slightest idea what Latitude was, or Longitude either, but thought they were nice grand words to say.)",
   "Down, down, down. There was nothing else to do, so Alice soon began talking again. “Dinah’ll miss me very much to-night, I should think!” (Dinah was the cat.) “I hope they’ll remember her saucer of milk at tea-time. Dinah my dear, I wish you were down here with me!”",
+  "Suddenly, thump! thump! down she came upon a heap of sticks and dry leaves, and the fall was over. Alice was not a bit hurt, and she jumped up on to her feet in a moment: she looked up, but it was all dark overhead; before her was another long passage, and the White Rabbit was still in sight, hurrying down it.",
+  "There was not a moment to be lost: away went Alice like the wind, and was just in time to hear it say, as it turned a corner, “Oh my ears and whiskers, how late it’s getting!” She was close behind it when she turned the corner, but the Rabbit was no longer to be seen.",
+  "She found herself in a long, low hall, which was lit up by a row of lamps hanging from the roof. There were doors all round the hall, but they were all locked; and when Alice had been all the way down one side and up the other, trying every door, she walked sadly down the middle, wondering how she was ever to get out again.",
+  "Suddenly she came upon a little three-legged table, all made of solid glass; there was nothing on it except a tiny golden key, and Alice’s first thought was that it might belong to one of the doors of the hall; but, alas! either the locks were too large, or the key was too small, but at any rate it would not open any of them.",
+  "However, on the second time round, she came upon a low curtain she had not noticed before, and behind it was a little door about fifteen inches high: she tried the little golden key in the lock, and to her great delight it fitted!",
+  "Alice opened the door and found that it led into a small passage: she knelt down and looked along it into the loveliest garden you ever saw. How she longed to get out of that dark hall, and wander about among those beds of bright flowers and those cool fountains — but she could not even get her head through the doorway.",
 ];
 
 function canvas() {
@@ -218,7 +224,7 @@ function pocketWatch(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: n
   const nums = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `500 ${Math.round(r * 0.2)}px ${SERIF}`;
+  ctx.font = `400 ${Math.round(r * 0.2)}px ${SERIF}`;
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
     const rr = r - 34;

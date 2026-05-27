@@ -15,11 +15,13 @@ const COVER_BACK = "#173f39";
 const STACK_Z0 = 0.05;
 const STACK_DZ = 0.01;
 
-// Camera framing: closed (right-weighted) -> open (pushed in, shifted left).
-const CAM_CLOSED = new THREE.Vector3(0.5, 0.7, 6.4);
-const CAM_OPEN = new THREE.Vector3(-0.2, 0.85, 5.3);
-const LOOK_CLOSED = new THREE.Vector3(0.7, 0.0, 0.0);
-const LOOK_OPEN = new THREE.Vector3(-0.05, 0.0, 0.0);
+// Camera framing: pulled back so the whole book always fits, with only a gentle
+// shift from the closed cover (slightly right) to the open spread (centred on the
+// spine). Staying far back avoids the book overflowing on large viewports.
+const CAM_CLOSED = new THREE.Vector3(0.35, 0.5, 7.0);
+const CAM_OPEN = new THREE.Vector3(0.05, 0.55, 6.85);
+const LOOK_CLOSED = new THREE.Vector3(0.5, 0.0, 0.0);
+const LOOK_OPEN = new THREE.Vector3(0.05, 0.0, 0.0);
 
 type Leaf = {
   frontMat: THREE.Material;
@@ -51,7 +53,7 @@ function buildBook(): Built {
     const isCover = li === 0;
     const front = createBendMaterial({
       map: faces[i],
-      bend: isCover ? 0.1 : 0.5,
+      bend: isCover ? 0.1 : 0.34,
       width: PAGE_W,
       side: THREE.FrontSide,
       stackZ: STACK_Z0 - li * STACK_DZ,
@@ -119,8 +121,14 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
   // Book only mounts once the Suspense boundary (environment map) has resolved, so
   // signalling ready here — after a frame paints — avoids the blank-flash on load.
   useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(onReady));
-    return () => cancelAnimationFrame(id);
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(onReady);
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
   }, [onReady]);
 
   // Release every GPU resource on unmount.
@@ -173,9 +181,9 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
         if (Math.abs(x - target) > EPS) busy = true;
         else x = target;
       } else {
-        const accel = (target - x) * 150 - vels.current[i] * 17;
+        const accel = (target - x) * 150 - vels.current[i] * 23;
         vels.current[i] += accel * dt;
-        x = THREE.MathUtils.clamp(x + vels.current[i] * dt, -0.06, 1.06);
+        x = THREE.MathUtils.clamp(x + vels.current[i] * dt, -0.02, 1.06);
         if (Math.abs(x - target) > EPS || Math.abs(vels.current[i]) > EPS) busy = true;
         else {
           x = target;
@@ -267,7 +275,8 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
         {/* page block — the physical bulk of paper, giving the book real
             thickness and a cream fore-edge. The hardcover overhangs it slightly. */}
         <mesh position={[PAGE_W / 2, 0, -0.074]}>
-          <boxGeometry args={[PAGE_W * 0.97, PAGE_H * 0.98, 0.172]} />
+          {/* Slight bleed past the sheets so the teal back cover never peeks. */}
+          <boxGeometry args={[PAGE_W + 0.02, PAGE_H + 0.02, 0.172]} />
           <meshStandardMaterial color="#e7dfcf" roughness={0.95} />
         </mesh>
 

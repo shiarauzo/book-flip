@@ -9,7 +9,7 @@ export default function App() {
   const [total, setTotal] = useState(0);
   const [ready, setReady] = useState(false);
 
-  const next = useCallback(() => setPage((p) => (p >= total ? 0 : p + 1)), [total]);
+  const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
   const turn = useCallback((dir: 1 | -1) => (dir < 0 ? prev() : next()), [prev, next]);
 
@@ -58,7 +58,7 @@ export default function App() {
         : `Reading — spread ${page} of ${total}.`;
 
   const hint =
-    page === 0 ? "Click, or press → to open" : page >= total ? "Click to start over" : "Click, or use ← →";
+    page === 0 ? "Click, or press → to open" : page >= total ? "The end · ‹ to go back" : "Click, or use ← →";
 
   return (
     <>
@@ -100,12 +100,12 @@ export default function App() {
         </Suspense>
 
         <ContactShadows
-          position={[0, -1.55, 0]}
-          opacity={0.4}
-          scale={10}
-          blur={2.6}
+          position={[0, -1.6, 0]}
+          opacity={0.55}
+          scale={11}
+          blur={2.8}
           far={4}
-          color="#3a3530"
+          color="#2a2417"
         />
       </Canvas>
 
@@ -144,7 +144,8 @@ export default function App() {
           type="button"
           className="nav-btn"
           onClick={next}
-          aria-label={page >= total ? "Restart book" : "Next page"}
+          disabled={page >= total}
+          aria-label="Next page"
         >
           ›
         </button>
