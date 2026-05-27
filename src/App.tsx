@@ -1,8 +1,10 @@
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { Book } from "./Book";
+import { CameraRig, type CamTarget } from "./CameraRig";
+import { Shelf, type ShelfBook } from "./shelf/Shelf";
 import { createAliceSource } from "./sources/aliceSource";
 import type { ChapterMark, PageSource } from "./sources/pageSource";
 import { ErrorToast } from "./ui/ErrorToast";
@@ -24,6 +26,40 @@ export default function App() {
   const [loadingLabel, setLoadingLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+
+  // Home is the shelf; opening a book switches to reading. (Single canvas.)
+  const [view, setView] = useState<"shelf" | "reading">("shelf");
+  const camTarget = useRef<CamTarget>({
+    pos: new THREE.Vector3(0, 0, 6.5),
+    look: new THREE.Vector3(0, 0, 0),
+  });
+  const books = useMemo<ShelfBook[]>(
+    () => [
+      {
+        id: "alice",
+        title: "Alice's Adventures in Wonderland",
+        spineBg: "#1f4e46",
+        spineInk: "#d8b46a",
+      },
+    ],
+    [],
+  );
+
+  const openBook = useCallback(
+    (book: ShelfBook) => {
+      if (book.id === "alice") setSource(alice);
+      setPage(0);
+      setView("reading");
+    },
+    [alice],
+  );
+
+  const backToShelf = useCallback(() => {
+    setView("shelf");
+    setPage(0);
+    setChapters([]);
+    setToc(false);
+  }, []);
 
   const loadPdf = useCallback(
     async (file: File) => {
@@ -47,6 +83,7 @@ export default function App() {
           return next;
         });
         setPage(0);
+        setView("reading");
       } catch (e) {
         setError((e as Error).message ?? "Couldn't open that PDF.");
       } finally {
@@ -55,17 +92,6 @@ export default function App() {
     },
     [alice],
   );
-
-  const resetToAlice = useCallback(() => {
-    setSource((prev) => {
-      if (prev !== alice) prev.dispose();
-      return alice;
-    });
-    setPage(0);
-    setError(null);
-  }, [alice]);
-
-  const isPdf = source !== alice;
 
   // Drop a PDF anywhere on the page to open it.
   useEffect(() => {
@@ -111,9 +137,15 @@ export default function App() {
     return () => window.clearTimeout(id);
   }, []);
 
-  // Keyboard: arrows / space / page keys / home / end / escape.
+  // Keyboard: arrows / space / page keys / home / end / escape (reading only).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setToc(false);
+        if (view === "reading") backToShelf();
+        return;
+      }
+      if (view !== "reading") return;
       switch (e.key) {
         case "ArrowRight":
         case "ArrowDown":
@@ -136,14 +168,11 @@ export default function App() {
           e.preventDefault();
           setPage(total);
           break;
-        case "Escape":
-          setToc(false);
-          break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [next, prev, total]);
+  }, [next, prev, total, view, backToShelf]);
 
   const announce =
     page === 0
@@ -157,7 +186,9 @@ export default function App() {
 
   return (
     <>
-      <h1 className="sr-only">{source.label} — an interactive 3D book</h1>
+      <h1 className="sr-only">
+        {view === "shelf" ? "Your bookshelf" : `${source.label} — an interactive 3D book`}
+      </h1>
 
       <div className={`loader${ready ? " loader--hidden" : ""}`} aria-hidden="true" />
 
@@ -182,15 +213,28 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Environment preset="apartment" />
+        </Suspense>
+
+        <CameraRig target={camTarget} />
+
+        {view === "shelf" ? (
+          <Shelf
+            books={books}
+            camTarget={camTarget}
+            onOpen={openBook}
+            onReady={() => setReady(true)}
+          />
+        ) : (
           <Book
             source={source}
             page={page}
+            camTarget={camTarget}
             onTotal={setTotal}
             onTurn={turn}
             onReady={() => setReady(true)}
             onChapters={setChapters}
           />
-        </Suspense>
+        )}
 
         <ContactShadows
           position={[0, -1.6, 0]}
@@ -202,18 +246,21 @@ export default function App() {
         />
       </Canvas>
 
-      <div className="sr-only" role="status" aria-live="polite">
-        {announce}
-      </div>
-
-      <p className="book-label" title={source.label}>
-        {source.label}
-      </p>
+      {view === "reading" && (
+        <>
+          <div className="sr-only" role="status" aria-live="polite">
+            {announce}
+          </div>
+          <p className="book-label" title={source.label}>
+            {source.label}
+          </p>
+        </>
+      )}
 
       <div className="top-actions">
-        {isPdf && (
-          <button type="button" className="reset-btn" onClick={resetToAlice}>
-            ↺ Alice
+        {view === "reading" && (
+          <button type="button" className="reset-btn" onClick={backToShelf}>
+            ← Shelf
           </button>
         )}
         <UploadButton onFile={loadPdf} busy={busy} />
@@ -230,12 +277,14 @@ export default function App() {
       )}
 
       {/* Phones: the spread is widest in landscape — nudge a rotate (CSS-gated). */}
-      <div className="rotate-hint" aria-hidden="true">
-        <div className="rotate-hint__inner">
-          <span className="rotate-hint__icon">↻</span>
-          <span>Rotate your phone to read the book</span>
+      {view === "reading" && (
+        <div className="rotate-hint" aria-hidden="true">
+          <div className="rotate-hint__inner">
+            <span className="rotate-hint__icon">↻</span>
+            <span>Rotate your phone to read the book</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Table of contents — only when this book exposes chapters/bookmarks */}
       {chapters.length > 0 && (
@@ -274,43 +323,47 @@ export default function App() {
         </>
       )}
 
-      <div
-        className="progress"
-        role="progressbar"
-        aria-label="Reading progress"
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={page}
-      >
-        <div
-          className="progress__fill"
-          style={{ transform: `scaleX(${total ? page / total : 0})` }}
-        />
-      </div>
+      {view === "reading" && (
+        <>
+          <div
+            className="progress"
+            role="progressbar"
+            aria-label="Reading progress"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={page}
+          >
+            <div
+              className="progress__fill"
+              style={{ transform: `scaleX(${total ? page / total : 0})` }}
+            />
+          </div>
 
-      <div className="controls">
-        <button
-          type="button"
-          className="nav-btn"
-          onClick={prev}
-          disabled={page === 0}
-          aria-label="Previous page"
-        >
-          ‹
-        </button>
-        <p className="hint" style={{ opacity: page === 0 ? 1 : 0.6 }}>
-          {hint}
-        </p>
-        <button
-          type="button"
-          className="nav-btn"
-          onClick={next}
-          disabled={page >= total}
-          aria-label="Next page"
-        >
-          ›
-        </button>
-      </div>
+          <div className="controls">
+            <button
+              type="button"
+              className="nav-btn"
+              onClick={prev}
+              disabled={page === 0}
+              aria-label="Previous page"
+            >
+              ‹
+            </button>
+            <p className="hint" style={{ opacity: page === 0 ? 1 : 0.6 }}>
+              {hint}
+            </p>
+            <button
+              type="button"
+              className="nav-btn"
+              onClick={next}
+              disabled={page >= total}
+              aria-label="Next page"
+            >
+              ›
+            </button>
+          </div>
+        </>
+      )}
     </>
   );
 }
