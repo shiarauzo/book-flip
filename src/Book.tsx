@@ -31,9 +31,10 @@ type BookProps = {
   page: number;
   onTotal: (total: number) => void;
   onTurn: (dir: 1 | -1) => void;
+  onReady: () => void;
 };
 
-export function Book({ page, onTotal, onTurn }: BookProps) {
+export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
   const { camera } = useThree();
   const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
@@ -101,6 +102,13 @@ export function Book({ page, onTotal, onTurn }: BookProps) {
 
   // Report leaf count up so the parent can drive page state, bounds and the UI.
   useEffect(() => onTotal(leaves.length), [leaves, onTotal]);
+
+  // Book only mounts once the Suspense boundary (environment map) has resolved, so
+  // signalling ready here — after a frame paints — avoids the blank-flash on load.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(onReady));
+    return () => cancelAnimationFrame(id);
+  }, [onReady]);
 
   // Release every GPU resource on unmount (textures, materials, geometry).
   useEffect(() => {

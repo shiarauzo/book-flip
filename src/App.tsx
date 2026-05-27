@@ -13,6 +13,12 @@ export default function App() {
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
   const turn = useCallback((dir: 1 | -1) => (dir < 0 ? prev() : next()), [prev, next]);
 
+  // Safety net: reveal even if the environment map never resolves.
+  useEffect(() => {
+    const id = window.setTimeout(() => setReady(true), 3000);
+    return () => window.clearTimeout(id);
+  }, []);
+
   // Keyboard: arrows / space / page keys / home / end.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -75,8 +81,6 @@ export default function App() {
             "aria-label",
             "A 3D edition of Alice's Adventures in Wonderland. Click, tap, or press the arrow keys to turn the pages.",
           );
-          // Reveal once the first frame has actually painted.
-          requestAnimationFrame(() => requestAnimationFrame(() => setReady(true)));
         }}
       >
         {/* Transparent canvas — the warm radial background lives in CSS (one source).
@@ -87,7 +91,12 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Environment preset="apartment" />
-          <Book page={page} onTotal={setTotal} onTurn={turn} />
+          <Book
+          page={page}
+          onTotal={setTotal}
+          onTurn={turn}
+          onReady={() => setReady(true)}
+        />
         </Suspense>
 
         <ContactShadows
@@ -131,7 +140,12 @@ export default function App() {
         <p className="hint" style={{ opacity: page === 0 ? 1 : 0.6 }}>
           {hint}
         </p>
-        <button type="button" className="nav-btn" onClick={next} aria-label="Next page">
+        <button
+          type="button"
+          className="nav-btn"
+          onClick={next}
+          aria-label={page >= total ? "Restart book" : "Next page"}
+        >
           ›
         </button>
       </div>
