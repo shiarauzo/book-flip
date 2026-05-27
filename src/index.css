@@ -92,6 +92,59 @@ body {
   outline-offset: 2px;
 }
 
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 70px;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 40px));
+  padding: 12px 14px 12px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(159, 18, 57, 0.3);
+  background: #fbedec;
+  color: #7a1f1f;
+  font: 400 15px/1.35 "EB Garamond", Georgia, serif;
+  box-shadow: 0 12px 32px rgba(40, 34, 20, 0.28);
+  animation: toast-in 0.22s ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.toast__msg {
+  flex: 1;
+}
+
+.toast__close {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #7a1f1f;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toast__close:hover {
+  background: rgba(122, 31, 31, 0.12);
+}
+
+.toast__close:focus-visible {
+  outline: 2px solid #7a1f1f;
+  outline-offset: 1px;
+}
+
 .pdf-loading {
   position: absolute;
   inset: 0;
