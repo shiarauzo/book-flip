@@ -84,13 +84,16 @@ export default function App() {
       const file = e.dataTransfer?.files?.[0];
       if (file) loadPdf(file);
     };
+    const onEnd = () => setDragging(false); // Escape / app-switch cancels a drag
     window.addEventListener("dragover", onOver);
     window.addEventListener("dragleave", onLeave);
     window.addEventListener("drop", onDrop);
+    window.addEventListener("dragend", onEnd);
     return () => {
       window.removeEventListener("dragover", onOver);
       window.removeEventListener("dragleave", onLeave);
       window.removeEventListener("drop", onDrop);
+      window.removeEventListener("dragend", onEnd);
     };
   }, [loadPdf]);
 
@@ -154,9 +157,7 @@ export default function App() {
 
   return (
     <>
-      <h1 className="sr-only">
-        Alice's Adventures in Wonderland — an interactive 3D book
-      </h1>
+      <h1 className="sr-only">{source.label} — an interactive 3D book</h1>
 
       <div className={`loader${ready ? " loader--hidden" : ""}`} aria-hidden="true" />
 
@@ -171,7 +172,7 @@ export default function App() {
           el.setAttribute("role", "application");
           el.setAttribute(
             "aria-label",
-            "A 3D edition of Alice's Adventures in Wonderland. Click, tap, or press the arrow keys to turn the pages.",
+            "An interactive 3D book. Click, tap, or press the arrow keys to turn the pages.",
           );
         }}
       >

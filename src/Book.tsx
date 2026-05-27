@@ -96,15 +96,20 @@ export function Book({ source, page, onTotal, onTurn, onReady, onChapters }: Boo
         pending.current.add(i);
         tex
           .then((t) => {
-            pending.current.delete(i);
+            // Only touch the cache/pending of the source that's still active —
+            // a late completion from a swapped-out source must not clear the new
+            // source's pending entry (which would suppress its render).
             if (sourceRef.current === owner) {
+              pending.current.delete(i);
               cache.current.set(i, t);
               invalidate();
             } else {
               t.dispose();
             }
           })
-          .catch(() => pending.current.delete(i));
+          .catch(() => {
+            if (sourceRef.current === owner) pending.current.delete(i);
+          });
       } else {
         cache.current.set(i, tex);
       }
