@@ -1,16 +1,18 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { createBendMaterial } from "./bendMaterial";
-import { chapterTexture, coverTexture, titlePageTexture } from "./textures";
+import { createBendMaterial, type BendUniforms } from "./bendMaterial";
+import { chapterPages, coverTexture, endTexture, titlePageTexture } from "./textures";
 
 const PAGE_W = 2.2;
 const PAGE_H = 3.0;
 
-// Palette — stylized clean: deep teal hardcover on warm cream pages.
 const COVER = "#1f4e46";
 const COVER_BACK = "#173f39";
-const PAPER = "#faf6ec";
+
+// Stacking: leaf 0 (cover) sits closest to the camera; each leaf a hair behind.
+const STACK_Z0 = 0.05;
+const STACK_DZ = 0.01;
 
 // Camera framing: closed (right-weighted) -> open (pushed in, shifted left).
 const CAM_CLOSED = new THREE.Vector3(0.5, 0.7, 6.4);
@@ -23,7 +25,13 @@ function smoothstep(x: number) {
   return t * t * (3 - 2 * t);
 }
 
-export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+type Leaf = {
+  frontMat: THREE.Material;
+  backMat: THREE.Material;
+  uniforms: BendUniforms;
+};
+
+export function Book() {
   const { camera } = useThree();
 
   // One subdivided plane reused by every sheet; left edge sits on the spine (x=0).
@@ -33,59 +41,52 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
     return g;
   }, []);
 
-  // Front cover (almost rigid): title on the outer face, clean endpaper on the
-  // inside. stackZ lives in the shader so the flip puts the open cover *under*
-  // the turned page, like a real book.
-  const coverFront = useMemo(
-    () =>
-      createBendMaterial({
-        bend: 0.06,
-        width: PAGE_W,
-        map: coverTexture(),
-        roughness: 0.55,
-        side: THREE.FrontSide,
-        stackZ: 0.06,
-      }),
-    [],
-  );
-  const coverBack = useMemo(
-    () =>
-      createBendMaterial({
-        color: COVER_BACK,
-        bend: 0.06,
-        width: PAGE_W,
-        side: THREE.BackSide,
-        uniforms: coverFront.uniforms,
-      }),
-    [coverFront],
-  );
+  // Build the book as a stack of leaves. Reading order of faces:
+  //   cover · title page · chapter pages… (padded to an even count).
+  // Each leaf is a sheet with a front (even face) and a back (odd face). The back
+  // texture is flipped in U so it reads correctly once the sheet has turned.
+  const leaves = useMemo<Leaf[]>(() => {
+    const faces: THREE.Texture[] = [
+      coverTexture(),
+      titlePageTexture(),
+      ...chapterPages(),
+    ];
+    if (faces.length % 2 !== 0) faces.push(endTexture());
 
-  // The first page bows like real paper: blank front, inner title page on its
-  // back (the left page of the open spread). Both halves share one uniforms set.
-  const pageFront = useMemo(
-    () =>
-      createBendMaterial({
-        color: PAPER,
-        bend: 0.55,
+    const out: Leaf[] = [];
+    for (let i = 0; i < faces.length; i += 2) {
+      const li = i / 2;
+      const isCover = li === 0;
+      const bend = isCover ? 0.1 : 0.5;
+      const stackZ = STACK_Z0 - li * STACK_DZ;
+
+      const front = createBendMaterial({
+        map: faces[i],
+        bend,
         width: PAGE_W,
         side: THREE.FrontSide,
-        stackZ: 0.04,
-      }),
-    [],
-  );
-  const pageBack = useMemo(
-    () =>
-      createBendMaterial({
-        bend: 0.55,
-        width: PAGE_W,
-        map: titlePageTexture(),
-        side: THREE.BackSide,
-        uniforms: pageFront.uniforms,
-      }),
-    [pageFront],
-  );
+        stackZ,
+        roughness: isCover ? 0.55 : 0.9,
+      });
 
-  // Static sheets revealed once the cover swings away.
+      const backTex = faces[i + 1];
+      backTex.wrapS = THREE.RepeatWrapping;
+      backTex.repeat.x = -1;
+      backTex.offset.x = 1;
+      const back = createBendMaterial({
+        map: backTex,
+        bend,
+        width: PAGE_W,
+        side: THREE.BackSide,
+        roughness: 0.9,
+        uniforms: front.uniforms, // share so both faces bend as one sheet
+      });
+
+      out.push({ frontMat: front.material, backMat: back.material, uniforms: front.uniforms });
+    }
+    return out;
+  }, []);
+
   const backMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
@@ -95,40 +96,31 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
       }),
     [],
   );
-  const chapterMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        map: chapterTexture(),
-        roughness: 0.9,
-        side: THREE.FrontSide,
-      }),
-    [],
-  );
+
+  // page = number of leaves currently turned. 0 = closed; leaves.length = fully read.
+  const [page, setPage] = useState(0);
+  const advance = () => setPage((p) => (p >= leaves.length ? 0 : p + 1));
 
   const group = useRef<THREE.Group>(null);
-  const coverProg = useRef(0);
-  const pageProg = useRef(0);
+  const progs = useRef<number[]>(leaves.map(() => 0));
+  const openness = useRef(0);
   const lookAt = useRef(LOOK_CLOSED.clone());
   const camPos = useRef(CAM_CLOSED.clone());
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
-    const target = open ? 1 : 0;
 
-    // Cover leads; the page trails it for a natural staggered turn.
-    coverProg.current = THREE.MathUtils.damp(coverProg.current, target, 4, dt);
-    pageProg.current = THREE.MathUtils.damp(
-      pageProg.current,
-      coverProg.current,
-      3,
-      dt,
-    );
-    coverFront.uniforms.uProgress.value = coverProg.current;
-    pageFront.uniforms.uProgress.value = pageProg.current;
+    // Each leaf eases toward turned (1) or not (0); only the one being flipped moves.
+    for (let i = 0; i < leaves.length; i++) {
+      const target = i < page ? 1 : 0;
+      progs.current[i] = THREE.MathUtils.damp(progs.current[i], target, 5, dt);
+      leaves[i].uniforms.uProgress.value = progs.current[i];
+    }
 
-    const eased = smoothstep(coverProg.current);
+    openness.current = THREE.MathUtils.damp(openness.current, page > 0 ? 1 : 0, 5, dt);
+    const eased = smoothstep(openness.current);
 
-    // Idle: gentle bob + sway that fades out as the book opens.
+    // Idle: gentle bob + sway that fades out once the book is open.
     if (group.current) {
       const t = state.clock.elapsedTime;
       const idle = 1 - eased;
@@ -137,7 +129,6 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
       group.current.rotation.x = -0.12;
     }
 
-    // Camera push-in + reframe, smoothed.
     camPos.current.lerpVectors(CAM_CLOSED, CAM_OPEN, eased);
     lookAt.current.lerpVectors(LOOK_CLOSED, LOOK_OPEN, eased);
     camera.position.x = THREE.MathUtils.damp(camera.position.x, camPos.current.x, 5, dt);
@@ -151,31 +142,45 @@ export function Book({ open, onToggle }: { open: boolean; onToggle: () => void }
   };
 
   return (
-    <group
-      ref={group}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      onPointerOver={() => setCursor("pointer")}
-      onPointerOut={() => setCursor("auto")}
-    >
-      {/* back cover (static) */}
-      <mesh geometry={geometry} material={backMat} position={[0, 0, 0]} />
-      {/* chapter page — the right side of the open spread (static) */}
-      <mesh geometry={geometry} material={chapterMat} position={[0, 0, 0.024]} />
-      {/* first page (bends, trails the cover): blank front + title page on back.
-          stackZ lives in the shader, so no position offset here. */}
-      <mesh geometry={geometry} material={pageFront.material} />
-      <mesh geometry={geometry} material={pageBack.material} />
-      {/* front cover (almost rigid, leads): title front + endpaper back */}
-      <mesh geometry={geometry} material={coverFront.material} />
-      <mesh geometry={geometry} material={coverBack.material} />
-      {/* spine */}
-      <mesh position={[0, 0, 0.03]}>
-        <boxGeometry args={[0.05, PAGE_H, 0.075]} />
-        <meshStandardMaterial color={COVER} roughness={0.8} />
+    <>
+      {/* Invisible backdrop so a click anywhere (not just on a page) turns a leaf. */}
+      <mesh
+        position={[0, 0, -3]}
+        onClick={advance}
+        onPointerOver={() => setCursor("pointer")}
+        onPointerOut={() => setCursor("auto")}
+      >
+        <planeGeometry args={[80, 50]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
-    </group>
+
+      <group
+        ref={group}
+        onClick={(e) => {
+          e.stopPropagation();
+          advance();
+        }}
+        onPointerOver={() => setCursor("pointer")}
+        onPointerOut={() => setCursor("auto")}
+      >
+        {/* back cover (static, revealed once every leaf has turned) */}
+        <mesh geometry={geometry} material={backMat} position={[0, 0, 0.012]} />
+
+        {/* leaves — front + back share one bend uniforms set; stackZ lives in the
+            shader so the flip inverts sheet order, like a real book. */}
+        {leaves.map((lf, i) => (
+          <group key={i}>
+            <mesh geometry={geometry} material={lf.frontMat} />
+            <mesh geometry={geometry} material={lf.backMat} />
+          </group>
+        ))}
+
+        {/* spine */}
+        <mesh position={[0, 0, 0.025]}>
+          <boxGeometry args={[0.05, PAGE_H, 0.06]} />
+          <meshStandardMaterial color={COVER} roughness={0.8} />
+        </mesh>
+      </group>
+    </>
   );
 }

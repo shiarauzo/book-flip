@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { Book } from "./Book";
 
 export default function App() {
-  const [open, setOpen] = useState(false);
-
   return (
     <>
       <Canvas
@@ -24,7 +21,7 @@ export default function App() {
         <directionalLight position={[-4, 2, -2]} intensity={0.4} />
         <Environment preset="apartment" />
 
-        <Book open={open} onToggle={() => setOpen((o) => !o)} />
+        <Book />
 
         <ContactShadows
           position={[0, -1.55, 0]}
@@ -36,9 +33,7 @@ export default function App() {
         />
       </Canvas>
 
-      <p className="hint" style={{ opacity: open ? 0 : 1 }}>
-        Click the book
-      </p>
+      <p className="hint">Click to turn the page</p>
     </>
   );
 }
