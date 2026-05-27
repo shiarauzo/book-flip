@@ -2,6 +2,7 @@ import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CamTarget } from "../CameraRig";
+import { useReducedMotion } from "../useReducedMotion";
 import { spineTexture } from "./spineTexture";
 
 export type ShelfBook = {
@@ -32,12 +33,14 @@ function SpineBook({
   x,
   opening,
   selected,
+  reduced,
   onOpen,
 }: {
   book: ShelfBook;
   x: number;
   opening: boolean;
   selected: boolean;
+  reduced: boolean;
   onOpen: () => void;
 }) {
   const invalidate = useThree((s) => s.invalidate);
@@ -71,13 +74,16 @@ function SpineBook({
     let busy = false;
 
     const pullT = opening ? 1 : 0;
-    pull.current = THREE.MathUtils.damp(pull.current, pullT, 7, dt);
-    if (Math.abs(pull.current - pullT) > 1e-3) busy = true;
-
-    // Lift on hover or keyboard selection (smoothly).
     const liftT = !opening && (hovered.current || selected) ? 1 : 0;
-    lift.current = THREE.MathUtils.damp(lift.current, liftT, 10, dt);
-    if (Math.abs(lift.current - liftT) > 1e-3) busy = true;
+    if (reduced) {
+      pull.current = pullT;
+      lift.current = liftT;
+    } else {
+      pull.current = THREE.MathUtils.damp(pull.current, pullT, 7, dt);
+      if (Math.abs(pull.current - pullT) > 1e-3) busy = true;
+      lift.current = THREE.MathUtils.damp(lift.current, liftT, 10, dt);
+      if (Math.abs(lift.current - liftT) > 1e-3) busy = true;
+    }
 
     m.position.set(x, pull.current * 0.45 + lift.current * 0.14, pull.current * 1.8 + lift.current * 0.4);
     m.rotation.y = pull.current * -0.5;
@@ -122,6 +128,9 @@ type Props = {
 
 export function Shelf({ books, camTarget, openingId, selectedId, onOpen, onReady }: Props) {
   const invalidate = useThree((s) => s.invalidate);
+  const reduced = useReducedMotion();
+
+  const span = books.length * BOOK_T + (books.length - 1) * GAP;
 
   useEffect(() => {
     camTarget.current.pos.copy(SHELF_POS);
@@ -131,18 +140,20 @@ export function Shelf({ books, camTarget, openingId, selectedId, onOpen, onReady
     return () => cancelAnimationFrame(id);
   }, [camTarget, invalidate, onReady]);
 
-  useFrame(() => {
+  useFrame((state) => {
     const t = camTarget.current;
     if (openingId) {
       t.pos.copy(PRESENT_POS);
       t.look.copy(PRESENT_LOOK);
     } else {
-      t.pos.copy(SHELF_POS);
+      // Pull back if the row of spines is wider than the view (many books / narrow).
+      const aspect = state.size.width / Math.max(1, state.size.height);
+      const fitZ = (span / 2 + 0.6) / (Math.tan((35 * Math.PI) / 180 / 2) * aspect);
+      t.pos.set(0, 0, Math.max(SHELF_POS.z, fitZ));
       t.look.copy(SHELF_LOOK);
     }
   });
 
-  const span = books.length * BOOK_T + (books.length - 1) * GAP;
   const x0 = -span / 2 + BOOK_T / 2;
   const boardW = Math.max(span + 1.1, 2.8);
   const bottom = -BOOK_H / 2;
@@ -156,6 +167,7 @@ export function Shelf({ books, camTarget, openingId, selectedId, onOpen, onReady
           x={x0 + i * (BOOK_T + GAP)}
           opening={openingId === b.id}
           selected={selectedId === b.id}
+          reduced={reduced}
           onOpen={() => onOpen(b)}
         />
       ))}

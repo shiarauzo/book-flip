@@ -33,7 +33,20 @@ export default function App() {
   const [view, setView] = useState<"shelf" | "transitioning" | "reading">("shelf");
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [currentBookId, setCurrentBookId] = useState<string | null>(null);
   const [fading, setFading] = useState(false);
+  // Synchronous guards so rapid clicks can't overlap a transition or write to a
+  // dead component.
+  const transitioning = useRef(false);
+  const viewRef = useRef<"shelf" | "transitioning" | "reading">("shelf");
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  viewRef.current = view;
   const camTarget = useRef<CamTarget>({
     pos: new THREE.Vector3(0, 0, 6.5),
     look: new THREE.Vector3(0, 0, 0),
@@ -81,6 +94,8 @@ export default function App() {
 
   const openBook = useCallback(
     (book: ShelfBook) => {
+      if (transitioning.current || viewRef.current !== "shelf") return; // no re-entry
+      transitioning.current = true;
       // Pull the book out + dissolve while its source loads, then read.
       setOpeningId(book.id);
       setView("transitioning");
@@ -91,40 +106,56 @@ export default function App() {
         try {
           const src = await resolveSource(book);
           await minWait;
+          if (!mounted.current) return;
           setSource(src);
+          setCurrentBookId(book.id);
           setPage(1); // land on the first open spread
           setView("reading");
         } catch (e) {
           await minWait;
+          if (!mounted.current) return;
           setError((e as Error).message ?? "Couldn't open that book.");
           setView("shelf");
         } finally {
-          setOpeningId(null);
-          window.setTimeout(() => setFading(false), 60);
+          transitioning.current = false;
+          if (mounted.current) {
+            setOpeningId(null);
+            window.setTimeout(() => mounted.current && setFading(false), 60);
+          }
         }
       })();
     },
     [resolveSource],
   );
 
-  const removeBook = useCallback((id: string) => {
-    if (id === "alice") return;
-    removePdf(id).catch(() => {});
-    sourcesById.current.get(id)?.dispose();
-    sourcesById.current.delete(id);
-    setLibrary((prev) => prev.filter((b) => b.id !== id));
-    setSelectedId(null);
-  }, []);
+  const removeBook = useCallback(
+    (id: string) => {
+      if (id === "alice") return;
+      removePdf(id).catch(() => {});
+      setLibrary((prev) => prev.filter((b) => b.id !== id));
+      setSelectedId(null);
+      const src = sourcesById.current.get(id);
+      sourcesById.current.delete(id);
+      // Never destroy the document that's currently being read.
+      if (!(viewRef.current === "reading" && currentBookId === id)) src?.dispose();
+    },
+    [currentBookId],
+  );
 
   const backToShelf = useCallback(() => {
+    if (transitioning.current) return;
+    transitioning.current = true;
     setFading(true);
     window.setTimeout(() => {
+      transitioning.current = false;
+      if (!mounted.current) return;
       setView("shelf");
       setPage(0);
       setChapters([]);
       setToc(false);
       setOpeningId(null);
-      window.setTimeout(() => setFading(false), 60);
+      setCurrentBookId(null);
+      window.setTimeout(() => mounted.current && setFading(false), 60);
     }, 280);
   }, []);
 
@@ -150,17 +181,15 @@ export default function App() {
         const doc = await loadPdfDocument(bytes, setProgress);
         sourcesById.current.set(meta.id, await createPdfSource(doc, name));
         setLibrary((prev) => [...prev, { id: meta.id, title: name, ...spineColors(meta.id) }]);
-        setView((v) => (v === "reading" ? "shelf" : v));
-        setPage(0);
-        setChapters([]);
-        setToc(false);
+        // Show the new book on the shelf (dissolve out of reading if needed).
+        if (viewRef.current === "reading") backToShelf();
       } catch (e) {
         setError((e as Error).message ?? "Couldn't open that PDF.");
       } finally {
         setBusy(false);
       }
     },
-    [],
+    [backToShelf],
   );
 
   // Drop a PDF anywhere on the page to open it.
