@@ -79,8 +79,6 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
       backTex.offset.x = 1;
       const back = createBendMaterial({
         map: backTex,
-        bend,
-        width: PAGE_W,
         side: THREE.BackSide,
         roughness: 0.9,
         uniforms: front.uniforms, // share so both faces bend as one sheet
