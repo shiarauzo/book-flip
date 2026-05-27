@@ -7,7 +7,10 @@ import type { ChapterMark, PageSource } from "./pageSource";
 const CW = 1024;
 const CH = Math.round((CW * 3.0) / 2.2); // 1396
 const PAPER = "#faf6ec";
-const RENDER_DPR = Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1, 2);
+// Render at the logical page size (matches Alice's texture budget). Going to 2×
+// DPR makes each cached page ~22 MB and a window of ~15 exhausts the GPU
+// (WebGL context loss), so keep parity with the rest of the book at 1024×1396.
+const RENDER_DPR = 1;
 
 function paperTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
