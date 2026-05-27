@@ -27,8 +27,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  // Home is the shelf; opening a book switches to reading. (Single canvas.)
-  const [view, setView] = useState<"shelf" | "reading">("shelf");
+  // Home is the shelf; opening a book pulls it out (transitioning) then reads.
+  const [view, setView] = useState<"shelf" | "transitioning" | "reading">("shelf");
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [fading, setFading] = useState(false);
   const camTarget = useRef<CamTarget>({
     pos: new THREE.Vector3(0, 0, 6.5),
     look: new THREE.Vector3(0, 0, 0),
@@ -47,18 +49,31 @@ export default function App() {
 
   const openBook = useCallback(
     (book: ShelfBook) => {
-      if (book.id === "alice") setSource(alice);
-      setPage(0);
-      setView("reading");
+      // Pull the book out (spine animates + camera dollies), dissolve, then read.
+      setOpeningId(book.id);
+      setView("transitioning");
+      setFading(true);
+      window.setTimeout(() => {
+        if (book.id === "alice") setSource(alice);
+        setPage(1); // land on the first open spread
+        setView("reading");
+        setOpeningId(null);
+        window.setTimeout(() => setFading(false), 60);
+      }, 380);
     },
     [alice],
   );
 
   const backToShelf = useCallback(() => {
-    setView("shelf");
-    setPage(0);
-    setChapters([]);
-    setToc(false);
+    setFading(true);
+    window.setTimeout(() => {
+      setView("shelf");
+      setPage(0);
+      setChapters([]);
+      setToc(false);
+      setOpeningId(null);
+      window.setTimeout(() => setFading(false), 60);
+    }, 280);
   }, []);
 
   const loadPdf = useCallback(
@@ -192,6 +207,9 @@ export default function App() {
 
       <div className={`loader${ready ? " loader--hidden" : ""}`} aria-hidden="true" />
 
+      {/* Quick dissolve that masks the shelf↔reading swap. */}
+      <div className={`fade${fading ? " fade--on" : ""}`} aria-hidden="true" />
+
       <Canvas
         shadows={false}
         frameloop="demand"
@@ -217,14 +235,7 @@ export default function App() {
 
         <CameraRig target={camTarget} />
 
-        {view === "shelf" ? (
-          <Shelf
-            books={books}
-            camTarget={camTarget}
-            onOpen={openBook}
-            onReady={() => setReady(true)}
-          />
-        ) : (
+        {view === "reading" ? (
           <Book
             source={source}
             page={page}
@@ -233,6 +244,14 @@ export default function App() {
             onTurn={turn}
             onReady={() => setReady(true)}
             onChapters={setChapters}
+          />
+        ) : (
+          <Shelf
+            books={books}
+            camTarget={camTarget}
+            openingId={openingId}
+            onOpen={openBook}
+            onReady={() => setReady(true)}
           />
         )}
 
