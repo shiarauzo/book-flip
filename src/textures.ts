@@ -224,7 +224,7 @@ function pocketWatch(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: n
   const nums = ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = `500 ${Math.round(r * 0.2)}px ${SERIF}`;
+  ctx.font = `400 ${Math.round(r * 0.2)}px ${SERIF}`;
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
     const rr = r - 34;

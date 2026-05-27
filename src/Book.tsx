@@ -121,8 +121,14 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
   // Book only mounts once the Suspense boundary (environment map) has resolved, so
   // signalling ready here — after a frame paints — avoids the blank-flash on load.
   useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(onReady));
-    return () => cancelAnimationFrame(id);
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(onReady);
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
   }, [onReady]);
 
   // Release every GPU resource on unmount.
@@ -177,7 +183,7 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
       } else {
         const accel = (target - x) * 150 - vels.current[i] * 23;
         vels.current[i] += accel * dt;
-        x = THREE.MathUtils.clamp(x + vels.current[i] * dt, -0.06, 1.06);
+        x = THREE.MathUtils.clamp(x + vels.current[i] * dt, -0.02, 1.06);
         if (Math.abs(x - target) > EPS || Math.abs(vels.current[i]) > EPS) busy = true;
         else {
           x = target;
@@ -269,7 +275,8 @@ export function Book({ page, onTotal, onTurn, onReady }: BookProps) {
         {/* page block — the physical bulk of paper, giving the book real
             thickness and a cream fore-edge. The hardcover overhangs it slightly. */}
         <mesh position={[PAGE_W / 2, 0, -0.074]}>
-          <boxGeometry args={[PAGE_W, PAGE_H * 0.995, 0.172]} />
+          {/* Slight bleed past the sheets so the teal back cover never peeks. */}
+          <boxGeometry args={[PAGE_W + 0.02, PAGE_H + 0.02, 0.172]} />
           <meshStandardMaterial color="#e7dfcf" roughness={0.95} />
         </mesh>
 
