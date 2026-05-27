@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from "react";
+import { type MutableRefObject, useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
+import type { CamTarget } from "./CameraRig";
 import { createBendMaterial } from "./bendMaterial";
 import type { ChapterMark, PageSource } from "./sources/pageSource";
 import { useReducedMotion } from "./useReducedMotion";
@@ -20,6 +21,7 @@ const LOOK_OPEN = new THREE.Vector3(0.05, 0.0, 0.0);
 type BookProps = {
   source: PageSource;
   page: number;
+  camTarget: MutableRefObject<CamTarget>;
   onTotal: (total: number) => void;
   onTurn: (dir: 1 | -1) => void;
   onReady: () => void;
@@ -37,8 +39,7 @@ function blankTexture(): THREE.CanvasTexture {
   return t;
 }
 
-export function Book({ source, page, onTotal, onTurn, onReady, onChapters }: BookProps) {
-  const { camera } = useThree();
+export function Book({ source, page, camTarget, onTotal, onTurn, onReady, onChapters }: BookProps) {
   const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
 
@@ -134,8 +135,6 @@ export function Book({ source, page, onTotal, onTurn, onReady, onChapters }: Boo
   const displayed = useRef(0);
   const hovered = useRef(false);
   const hoverAmt = useRef(0);
-  const lookAt = useRef(LOOK_CLOSED.clone());
-  const camPos = useRef(CAM_CLOSED.clone());
 
   // On source swap, drop the old book's textures and start fresh from the cover.
   useEffect(() => {
@@ -268,16 +267,13 @@ export function Book({ source, page, onTotal, onTurn, onReady, onChapters }: Boo
       group.current.rotation.x = baseX;
     }
 
+    // Write the desired camera pose into the shared target; CameraRig owns the
+    // actual camera. (Reading framing: closed → open, pulled back for narrow.)
     const aspect = state.size.width / Math.max(1, state.size.height);
     const fit = 1 + Math.max(0, 1.3 - aspect) * 1.15;
-    camPos.current.lerpVectors(CAM_CLOSED, CAM_OPEN, eased);
-    camPos.current.z *= fit;
-    lookAt.current.lerpVectors(LOOK_CLOSED, LOOK_OPEN, eased);
-    camera.position.x = THREE.MathUtils.damp(camera.position.x, camPos.current.x, 5, dt);
-    camera.position.y = THREE.MathUtils.damp(camera.position.y, camPos.current.y, 5, dt);
-    camera.position.z = THREE.MathUtils.damp(camera.position.z, camPos.current.z, 5, dt);
-    if (camera.position.distanceTo(camPos.current) > EPS) busy = true;
-    camera.lookAt(lookAt.current);
+    camTarget.current.pos.lerpVectors(CAM_CLOSED, CAM_OPEN, eased);
+    camTarget.current.pos.z *= fit;
+    camTarget.current.look.lerpVectors(LOOK_CLOSED, LOOK_OPEN, eased);
 
     if (busy) invalidate();
   });
