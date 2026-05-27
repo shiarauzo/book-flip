@@ -11,6 +11,7 @@ export default function App() {
 
   const next = useCallback(() => setPage((p) => (p >= total ? 0 : p + 1)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
+  const turn = useCallback((dir: 1 | -1) => (dir < 0 ? prev() : next()), [prev, next]);
 
   // Keyboard: arrows / space / page keys / home / end.
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Environment preset="apartment" />
-          <Book page={page} onTotal={setTotal} onAdvance={next} />
+          <Book page={page} onTotal={setTotal} onTurn={turn} />
         </Suspense>
 
         <ContactShadows

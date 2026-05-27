@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { createBendMaterial, type BendUniforms } from "./bendMaterial";
 import { chapterPages, coverTexture, endTexture, titlePageTexture } from "./textures";
@@ -30,10 +30,10 @@ type Leaf = {
 type BookProps = {
   page: number;
   onTotal: (total: number) => void;
-  onAdvance: () => void;
+  onTurn: (dir: 1 | -1) => void;
 };
 
-export function Book({ page, onTotal, onAdvance }: BookProps) {
+export function Book({ page, onTotal, onTurn }: BookProps) {
   const { camera } = useThree();
   const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
@@ -213,12 +213,19 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
     document.body.style.cursor = c;
   };
 
+  // From the cover, any click opens. Once reading, the left half goes back and
+  // the right half goes forward — like turning a real book.
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (page === 0) return onTurn(1);
+    onTurn(e.nativeEvent.clientX < window.innerWidth / 2 ? -1 : 1);
+  };
+
   return (
     <>
       {/* Invisible backdrop so a click anywhere (not just on a page) turns a leaf. */}
       <mesh
         position={[0, 0, -3]}
-        onClick={onAdvance}
+        onClick={handleClick}
         onPointerOver={() => setCursor("pointer")}
         onPointerOut={() => setCursor("auto")}
       >
@@ -230,7 +237,7 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
         ref={group}
         onClick={(e) => {
           e.stopPropagation();
-          onAdvance();
+          handleClick(e);
         }}
         onPointerOver={() => {
           setCursor("pointer");
