@@ -42,6 +42,45 @@ function toTexture(c: HTMLCanvasElement): THREE.CanvasTexture {
   return t;
 }
 
+// A cached 128px noise tile reused as a repeating pattern for paper/cloth grain.
+let noiseTile: HTMLCanvasElement | null = null;
+function noiseCanvas(): HTMLCanvasElement {
+  if (noiseTile) return noiseTile;
+  const n = document.createElement("canvas");
+  n.width = n.height = 128;
+  const nc = n.getContext("2d")!;
+  const img = nc.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 210 + Math.random() * 45;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = Math.random() * 20;
+  }
+  nc.putImageData(img, 0, 0);
+  noiseTile = n;
+  return n;
+}
+
+/** Warm paper fill: base colour, fine grain, and a soft inner vignette. */
+function paperFill(ctx: CanvasRenderingContext2D, base = PAPER) {
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, CW, CH);
+
+  const pat = ctx.createPattern(noiseCanvas(), "repeat");
+  if (pat) {
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = pat;
+    ctx.fillRect(0, 0, CW, CH);
+    ctx.restore();
+  }
+
+  const g = ctx.createRadialGradient(CW / 2, CH / 2, CH * 0.32, CW / 2, CH / 2, CH * 0.78);
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, "rgba(92,72,40,0.07)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, CW, CH);
+}
+
 /** Center a line of letter-spaced small caps. */
 function spacedCaps(
   ctx: CanvasRenderingContext2D,
@@ -119,8 +158,7 @@ export function coverTexture(): THREE.CanvasTexture {
 /** Inner title page. */
 export function titlePageTexture(): THREE.CanvasTexture {
   const { c, ctx } = canvas();
-  ctx.fillStyle = PAPER;
-  ctx.fillRect(0, 0, CW, CH);
+  paperFill(ctx);
 
   const cx = CW / 2;
   spacedCaps(ctx, "Alice's Adventures", cx, 470, 58, 4, INK, "400");
@@ -160,8 +198,7 @@ export function chapterPages(): THREE.CanvasTexture[] {
     if (out.length) drawPageNum();
     const cv = canvas();
     ctx = cv.ctx;
-    ctx.fillStyle = PAPER;
-    ctx.fillRect(0, 0, CW, CH);
+    paperFill(ctx);
     out.push(cv.c);
     pageNum++;
     if (first) {
@@ -237,8 +274,7 @@ export function chapterPages(): THREE.CanvasTexture[] {
 /** A blank page used to pad the leaf count to an even number / close the excerpt. */
 export function endTexture(): THREE.CanvasTexture {
   const { c, ctx } = canvas();
-  ctx.fillStyle = PAPER;
-  ctx.fillRect(0, 0, CW, CH);
+  paperFill(ctx);
   const cx = CW / 2;
   divider(ctx, cx, CH / 2 - 60, 200, INK_SOFT);
   spacedCaps(ctx, "End of excerpt", cx, CH / 2 + 10, 26, 6, INK_SOFT, "400");
