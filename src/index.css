@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --bg: #ece9e4;
 }
 
 * {
@@ -22,7 +23,7 @@ body {
     -apple-system,
     "Segoe UI",
     sans-serif;
-  background: #ece9e4;
+  background: radial-gradient(125% 105% at 50% 32%, #f3efe7 0%, #e7e1d5 55%, #dcd4c5 100%);
 }
 
 #root {

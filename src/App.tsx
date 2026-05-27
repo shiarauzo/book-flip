@@ -65,7 +65,7 @@ export default function App() {
         shadows={false}
         frameloop="demand"
         dpr={[1, 2]}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping }}
         camera={{ position: [0.5, 0.7, 6.4], fov: 35 }}
         onCreated={({ gl }) => {
           const el = gl.domElement;
@@ -78,13 +78,11 @@ export default function App() {
           requestAnimationFrame(() => requestAnimationFrame(() => setReady(true)));
         }}
       >
-        <color attach="background" args={["#ece9e4"]} />
-        <fog attach="fog" args={["#ece9e4", 9, 16]} />
-
-        {/* Stylized lighting: soft fill + one shaping key light. */}
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[3, 5, 4]} intensity={1.4} />
-        <directionalLight position={[-4, 2, -2]} intensity={0.4} />
+        {/* Transparent canvas — the warm radial background lives in CSS (one source).
+            Stylized lighting: warm key, cool fill, soft ambient. */}
+        <ambientLight intensity={0.55} />
+        <directionalLight position={[3, 5, 4]} intensity={1.5} color="#fff4e2" />
+        <directionalLight position={[-4, 2, -2]} intensity={0.45} color="#dfe8ff" />
 
         <Suspense fallback={null}>
           <Environment preset="apartment" />
