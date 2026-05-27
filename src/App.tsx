@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
@@ -60,6 +60,7 @@ export default function App() {
 
       <Canvas
         shadows={false}
+        frameloop="demand"
         dpr={[1, 2]}
         gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
         camera={{ position: [0.5, 0.7, 6.4], fov: 35 }}
@@ -79,9 +80,11 @@ export default function App() {
         <ambientLight intensity={0.6} />
         <directionalLight position={[3, 5, 4]} intensity={1.4} />
         <directionalLight position={[-4, 2, -2]} intensity={0.4} />
-        <Environment preset="apartment" />
 
-        <Book page={page} onTotal={setTotal} onAdvance={next} />
+        <Suspense fallback={null}>
+          <Environment preset="apartment" />
+          <Book page={page} onTotal={setTotal} onAdvance={next} />
+        </Suspense>
 
         <ContactShadows
           position={[0, -1.55, 0]}

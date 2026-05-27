@@ -21,11 +21,6 @@ const CAM_OPEN = new THREE.Vector3(-0.2, 0.85, 5.3);
 const LOOK_CLOSED = new THREE.Vector3(0.7, 0.0, 0.0);
 const LOOK_OPEN = new THREE.Vector3(-0.05, 0.0, 0.0);
 
-function smoothstep(x: number) {
-  const t = Math.min(1, Math.max(0, x));
-  return t * t * (3 - 2 * t);
-}
-
 type Leaf = {
   frontMat: THREE.Material;
   backMat: THREE.Material;
@@ -40,6 +35,7 @@ type BookProps = {
 
 export function Book({ page, onTotal, onAdvance }: BookProps) {
   const { camera } = useThree();
+  const invalidate = useThree((s) => s.invalidate);
   const reduced = useReducedMotion();
 
   // One subdivided plane reused by every sheet; left edge sits on the spine (x=0).
@@ -128,25 +124,39 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
   const lookAt = useRef(LOOK_CLOSED.clone());
   const camPos = useRef(CAM_CLOSED.clone());
 
+  // Wake the on-demand render loop whenever the target page changes (and on mount,
+  // again shortly after, to cover the async environment map resolving).
+  useEffect(() => {
+    invalidate();
+    const id = window.setTimeout(invalidate, 250);
+    return () => window.clearTimeout(id);
+  }, [page, invalidate]);
+
   useFrame((state, delta) => {
     const dt = Math.min(delta, 1 / 30);
     // Reduced motion: snap turns quickly and drop the ambient idle entirely.
     const turnLambda = reduced ? 16 : 5;
+    const EPS = 1e-3;
+    let busy = false;
 
     // Each leaf eases toward turned (1) or not (0); only the one being flipped moves.
     for (let i = 0; i < leaves.length; i++) {
       const target = i < page ? 1 : 0;
-      progs.current[i] = THREE.MathUtils.damp(progs.current[i], target, turnLambda, dt);
+      const v = THREE.MathUtils.damp(progs.current[i], target, turnLambda, dt);
+      progs.current[i] = Math.abs(v - target) < EPS ? target : ((busy = true), v);
       leaves[i].uniforms.uProgress.value = progs.current[i];
     }
 
-    openness.current = THREE.MathUtils.damp(openness.current, page > 0 ? 1 : 0, turnLambda, dt);
-    const eased = smoothstep(openness.current);
+    const oTarget = page > 0 ? 1 : 0;
+    const ov = THREE.MathUtils.damp(openness.current, oTarget, turnLambda, dt);
+    openness.current = Math.abs(ov - oTarget) < EPS ? oTarget : ((busy = true), ov);
+    const eased = THREE.MathUtils.smoothstep(openness.current, 0, 1);
 
     // Idle: gentle bob + sway that fades out once the book is open (off if reduced).
     if (group.current) {
       const t = state.clock.elapsedTime;
       const idle = reduced ? 0 : 1 - eased;
+      if (idle > EPS) busy = true; // keep the loop alive while the sway breathes
       group.current.position.y = Math.sin(t * 0.9) * 0.04 * idle;
       group.current.rotation.y = -0.32 + Math.sin(t * 0.5) * 0.05 * idle;
       group.current.rotation.x = -0.12;
@@ -157,7 +167,10 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
     camera.position.x = THREE.MathUtils.damp(camera.position.x, camPos.current.x, 5, dt);
     camera.position.y = THREE.MathUtils.damp(camera.position.y, camPos.current.y, 5, dt);
     camera.position.z = THREE.MathUtils.damp(camera.position.z, camPos.current.z, 5, dt);
+    if (camera.position.distanceTo(camPos.current) > EPS) busy = true;
     camera.lookAt(lookAt.current);
+
+    if (busy) invalidate();
   });
 
   const setCursor = (c: string) => {
