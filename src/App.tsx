@@ -100,6 +100,20 @@ export default function App() {
         {announce}
       </div>
 
+      <div
+        className="progress"
+        role="progressbar"
+        aria-label="Reading progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={page}
+      >
+        <div
+          className="progress__fill"
+          style={{ transform: `scaleX(${total ? page / total : 0})` }}
+        />
+      </div>
+
       <div className="controls">
         <button
           type="button"
