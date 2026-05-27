@@ -177,29 +177,56 @@ export function chapterPages(): THREE.CanvasTexture[] {
     ctx.textAlign = "left";
   };
 
-  startPage(true);
-
-  for (const para of ALICE_CH1) {
-    const words = para.split(" ");
+  // Greedy word-wrap into lines; the available width can vary per line index
+  // (used to wrap the opening lines around the drop-cap).
+  const layout = (text: string, widthForLine: (i: number) => number): string[] => {
+    const words = text.split(" ");
+    const lines: string[] = [];
     let line = "";
-    let firstLine = true;
-    const flush = (txt: string, indent: number) => {
-      if (y > bottom) startPage(false);
-      ctx.fillText(txt, marginX + indent, y);
-      y += lineH;
-    };
     for (const w of words) {
-      const indent = firstLine ? 40 : 0;
       const test = line ? `${line} ${w}` : w;
-      if (ctx.measureText(test).width > colW - indent && line) {
-        flush(line, indent);
+      if (ctx.measureText(test).width > widthForLine(lines.length) && line) {
+        lines.push(line);
         line = w;
-        firstLine = false;
       } else {
         line = test;
       }
     }
-    if (line) flush(line, firstLine ? 40 : 0);
+    if (line) lines.push(line);
+    return lines;
+  };
+
+  const drawLine = (txt: string, x: number) => {
+    if (y > bottom) startPage(false);
+    ctx.fillText(txt, x, y);
+    y += lineH;
+  };
+
+  startPage(true);
+
+  // First paragraph opens with a raised drop-cap "A".
+  const [opening, ...rest] = ALICE_CH1;
+  const cap = opening.slice(0, 1);
+  const body = opening.slice(1).replace(/^\s+/, "");
+
+  ctx.font = `400 104px ${SERIF}`;
+  const capW = ctx.measureText(cap).width;
+  ctx.fillStyle = INK;
+  ctx.fillText(cap, marginX, y + 66);
+  ctx.font = `400 33px ${SERIF}`;
+
+  const capLines = 2; // lines that sit beside the cap
+  const capIndent = capW + 18;
+  layout(body, (i) => colW - (i < capLines ? capIndent : 0)).forEach((ln, i) =>
+    drawLine(ln, marginX + (i < capLines ? capIndent : 0)),
+  );
+  y += 16;
+
+  // Remaining paragraphs: first line indented, then flush left.
+  for (const para of rest) {
+    layout(para, (i) => colW - (i === 0 ? 40 : 0)).forEach((ln, i) =>
+      drawLine(ln, marginX + (i === 0 ? 40 : 0)),
+    );
     y += 16;
   }
   drawPageNum();
