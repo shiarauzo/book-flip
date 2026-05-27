@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { createBendMaterial, type BendUniforms } from "./bendMaterial";
@@ -32,7 +32,13 @@ type Leaf = {
   uniforms: BendUniforms;
 };
 
-export function Book() {
+type BookProps = {
+  page: number;
+  onTotal: (total: number) => void;
+  onAdvance: () => void;
+};
+
+export function Book({ page, onTotal, onAdvance }: BookProps) {
   const { camera } = useThree();
   const reduced = useReducedMotion();
 
@@ -99,9 +105,8 @@ export function Book() {
     [],
   );
 
-  // page = number of leaves currently turned. 0 = closed; leaves.length = fully read.
-  const [page, setPage] = useState(0);
-  const advance = () => setPage((p) => (p >= leaves.length ? 0 : p + 1));
+  // Report leaf count up so the parent can drive page state, bounds and the UI.
+  useEffect(() => onTotal(leaves.length), [leaves, onTotal]);
 
   const group = useRef<THREE.Group>(null);
   const progs = useRef<number[]>(leaves.map(() => 0));
@@ -150,7 +155,7 @@ export function Book() {
       {/* Invisible backdrop so a click anywhere (not just on a page) turns a leaf. */}
       <mesh
         position={[0, 0, -3]}
-        onClick={advance}
+        onClick={onAdvance}
         onPointerOver={() => setCursor("pointer")}
         onPointerOut={() => setCursor("auto")}
       >
@@ -162,7 +167,7 @@ export function Book() {
         ref={group}
         onClick={(e) => {
           e.stopPropagation();
-          advance();
+          onAdvance();
         }}
         onPointerOver={() => setCursor("pointer")}
         onPointerOut={() => setCursor("auto")}
