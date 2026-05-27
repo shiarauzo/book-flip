@@ -30,7 +30,8 @@ function canvas() {
   const c = document.createElement("canvas");
   c.width = CW;
   c.height = CH;
-  const ctx = c.getContext("2d")!;
+  const ctx = c.getContext("2d");
+  if (!ctx) throw new Error("2D canvas context unavailable");
   return { c, ctx };
 }
 

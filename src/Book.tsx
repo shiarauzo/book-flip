@@ -100,13 +100,27 @@ export function Book({ page, onTotal, onAdvance }: BookProps) {
       new THREE.MeshStandardMaterial({
         color: COVER_BACK,
         roughness: 0.85,
-        side: THREE.DoubleSide,
+        side: THREE.FrontSide,
       }),
     [],
   );
 
   // Report leaf count up so the parent can drive page state, bounds and the UI.
   useEffect(() => onTotal(leaves.length), [leaves, onTotal]);
+
+  // Release every GPU resource on unmount (textures, materials, geometry).
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      backMat.dispose();
+      for (const lf of leaves) {
+        (lf.frontMat as THREE.MeshStandardMaterial).map?.dispose();
+        (lf.backMat as THREE.MeshStandardMaterial).map?.dispose();
+        lf.frontMat.dispose();
+        lf.backMat.dispose();
+      }
+    };
+  }, [geometry, backMat, leaves]);
 
   const group = useRef<THREE.Group>(null);
   const progs = useRef<number[]>(leaves.map(() => 0));
