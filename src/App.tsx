@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { Book } from "./Book";
 import { CameraRig, type CamTarget } from "./CameraRig";
 import { Shelf, type ShelfBook } from "./shelf/Shelf";
+import { addPdf, getPdfBytes, listPdfs } from "./library/db";
+import { spineColors } from "./library/spineColors";
 import { createAliceSource } from "./sources/aliceSource";
 import type { ChapterMark, PageSource } from "./sources/pageSource";
 import { ErrorToast } from "./ui/ErrorToast";
@@ -35,33 +37,73 @@ export default function App() {
     pos: new THREE.Vector3(0, 0, 6.5),
     look: new THREE.Vector3(0, 0, 0),
   });
-  const books = useMemo<ShelfBook[]>(
-    () => [
-      {
-        id: "alice",
-        title: "Alice's Adventures in Wonderland",
-        spineBg: "#1f4e46",
-        spineInk: "#d8b46a",
-      },
-    ],
+  const aliceBook = useMemo<ShelfBook>(
+    () => ({
+      id: "alice",
+      title: "Alice's Adventures in Wonderland",
+      spineBg: "#1f4e46",
+      spineInk: "#d8b46a",
+    }),
     [],
+  );
+  const [library, setLibrary] = useState<ShelfBook[]>(() => [aliceBook]);
+  const sourcesById = useRef(new Map<string, PageSource>());
+
+  // Rebuild the shelf from IndexedDB on load (persisted uploads).
+  useEffect(() => {
+    listPdfs()
+      .then((metas) =>
+        setLibrary([
+          aliceBook,
+          ...metas.map((m) => ({ id: m.id, title: m.name, ...spineColors(m.id) })),
+        ]),
+      )
+      .catch(() => {});
+  }, [aliceBook]);
+
+  const resolveSource = useCallback(
+    async (book: ShelfBook): Promise<PageSource> => {
+      if (book.id === "alice") return alice;
+      const cached = sourcesById.current.get(book.id);
+      if (cached) return cached;
+      const { loadPdfDocument } = await import("./pdf/loadPdf");
+      const { createPdfSource } = await import("./sources/pdfSource");
+      const bytes = await getPdfBytes(book.id);
+      if (!bytes) throw new Error("That book is no longer in your library.");
+      const doc = await loadPdfDocument(bytes);
+      const src = await createPdfSource(doc, book.title);
+      sourcesById.current.set(book.id, src);
+      return src;
+    },
+    [alice],
   );
 
   const openBook = useCallback(
     (book: ShelfBook) => {
-      // Pull the book out (spine animates + camera dollies), dissolve, then read.
+      // Pull the book out + dissolve while its source loads, then read.
       setOpeningId(book.id);
       setView("transitioning");
       setFading(true);
-      window.setTimeout(() => {
-        if (book.id === "alice") setSource(alice);
-        setPage(1); // land on the first open spread
-        setView("reading");
-        setOpeningId(null);
-        window.setTimeout(() => setFading(false), 60);
-      }, 380);
+      setError(null);
+      const minWait = new Promise((r) => window.setTimeout(r, 380));
+      (async () => {
+        try {
+          const src = await resolveSource(book);
+          await minWait;
+          setSource(src);
+          setPage(1); // land on the first open spread
+          setView("reading");
+        } catch (e) {
+          await minWait;
+          setError((e as Error).message ?? "Couldn't open that book.");
+          setView("shelf");
+        } finally {
+          setOpeningId(null);
+          window.setTimeout(() => setFading(false), 60);
+        }
+      })();
     },
-    [alice],
+    [resolveSource],
   );
 
   const backToShelf = useCallback(() => {
@@ -76,7 +118,8 @@ export default function App() {
     }, 280);
   }, []);
 
-  const loadPdf = useCallback(
+  // Upload: validate, persist to IndexedDB, add to the shelf (does not auto-open).
+  const uploadPdf = useCallback(
     async (file: File) => {
       setError(null);
       const { validatePdfFile, loadPdfDocument } = await import("./pdf/loadPdf");
@@ -90,22 +133,24 @@ export default function App() {
       setBusy(true);
       try {
         const { createPdfSource } = await import("./sources/pdfSource");
-        const buf = await file.arrayBuffer();
-        const doc = await loadPdfDocument(buf, setProgress);
-        const next = await createPdfSource(doc, file.name.replace(/\.pdf$/i, ""));
-        setSource((prev) => {
-          if (prev !== alice) prev.dispose();
-          return next;
-        });
+        const bytes = await file.arrayBuffer();
+        const name = file.name.replace(/\.pdf$/i, "");
+        // Store a copy first — pdf.js may transfer/detach the buffer to its worker.
+        const meta = await addPdf(name, bytes.slice(0));
+        const doc = await loadPdfDocument(bytes, setProgress);
+        sourcesById.current.set(meta.id, await createPdfSource(doc, name));
+        setLibrary((prev) => [...prev, { id: meta.id, title: name, ...spineColors(meta.id) }]);
+        setView((v) => (v === "reading" ? "shelf" : v));
         setPage(0);
-        setView("reading");
+        setChapters([]);
+        setToc(false);
       } catch (e) {
         setError((e as Error).message ?? "Couldn't open that PDF.");
       } finally {
         setBusy(false);
       }
     },
-    [alice],
+    [],
   );
 
   // Drop a PDF anywhere on the page to open it.
@@ -123,7 +168,7 @@ export default function App() {
       e.preventDefault();
       setDragging(false);
       const file = e.dataTransfer?.files?.[0];
-      if (file) loadPdf(file);
+      if (file) uploadPdf(file);
     };
     const onEnd = () => setDragging(false); // Escape / app-switch cancels a drag
     window.addEventListener("dragover", onOver);
@@ -136,7 +181,7 @@ export default function App() {
       window.removeEventListener("drop", onDrop);
       window.removeEventListener("dragend", onEnd);
     };
-  }, [loadPdf]);
+  }, [uploadPdf]);
 
   const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
@@ -247,7 +292,7 @@ export default function App() {
           />
         ) : (
           <Shelf
-            books={books}
+            books={library}
             camTarget={camTarget}
             openingId={openingId}
             onOpen={openBook}
@@ -282,7 +327,7 @@ export default function App() {
             ← Shelf
           </button>
         )}
-        <UploadButton onFile={loadPdf} busy={busy} />
+        <UploadButton onFile={uploadPdf} busy={busy} />
       </div>
 
       {busy && <LoadingOverlay label={loadingLabel} progress={progress} />}
