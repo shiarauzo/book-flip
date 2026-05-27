@@ -320,8 +320,11 @@ export function layoutBook(): PageDesc[] {
     }
   }
 
-  const faces: PageDesc[] = [{ kind: "cover" }, { kind: "title" }, ...content, { kind: "end" }];
-  if (faces.length % 2 !== 0) faces.push({ kind: "blank" });
+  const faces: PageDesc[] = [{ kind: "cover" }, { kind: "title" }, ...content];
+  // Pad so "The End" lands on a right-hand page (recto): then clicking it turns
+  // forward (and clamps) rather than reading as a left-half "go back".
+  if (faces.length % 2 === 1) faces.push({ kind: "blank" });
+  faces.push({ kind: "end" });
   return faces;
 }
 

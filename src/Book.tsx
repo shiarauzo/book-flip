@@ -45,7 +45,9 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
 
   // Page descriptors for the whole book (CPU-only). Textures are made on demand.
   const faces = useMemo<PageDesc[]>(() => layoutBook(), []);
-  const sheets = Math.ceil(faces.length / 2);
+  // faces.length is odd by construction; the final spread (page = sheets) shows
+  // the last page on the left and "The End" on the right.
+  const sheets = (faces.length - 1) / 2;
 
   useEffect(() => onTotal(sheets), [sheets, onTotal]);
 
@@ -184,7 +186,7 @@ export function Book({ page, onTotal, onTurn, onReady, onChapters }: BookProps) 
     else busy = true;
     displayed.current = d;
 
-    const f = Math.min(Math.floor(d + 1e-4), sheets - 1);
+    const f = Math.floor(d + 1e-4);
     const frac = THREE.MathUtils.clamp(d - f, 0, 1);
     const flipping = frac > EPS && frac < 1 - EPS;
 
