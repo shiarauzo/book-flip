@@ -4,7 +4,8 @@ import { ContactShadows, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { Book } from "./Book";
 import { createAliceSource } from "./sources/aliceSource";
-import type { ChapterMark } from "./sources/pageSource";
+import type { ChapterMark, PageSource } from "./sources/pageSource";
+import { UploadButton } from "./ui/UploadButton";
 
 export default function App() {
   const [page, setPage] = useState(0);
@@ -13,8 +14,38 @@ export default function App() {
   const [chapters, setChapters] = useState<ChapterMark[]>([]);
   const [toc, setToc] = useState(false);
 
-  // The active page source. Default: the built-in Alice demo. (PDF upload swaps this.)
-  const source = useMemo(() => createAliceSource(), []);
+  // The active page source. Default: the built-in Alice demo; uploading swaps it.
+  const alice = useMemo(() => createAliceSource(), []);
+  const [source, setSource] = useState<PageSource>(alice);
+  const [busy, setBusy] = useState(false);
+
+  const loadPdf = useCallback(
+    async (file: File) => {
+      const { validatePdfFile, loadPdfDocument } = await import("./pdf/loadPdf");
+      const bad = validatePdfFile(file);
+      if (bad) {
+        window.alert(bad.message); // V5 replaces this with an in-app toast
+        return;
+      }
+      setBusy(true);
+      try {
+        const { createPdfSource } = await import("./sources/pdfSource");
+        const buf = await file.arrayBuffer();
+        const doc = await loadPdfDocument(buf);
+        const next = await createPdfSource(doc, file.name.replace(/\.pdf$/i, ""));
+        setSource((prev) => {
+          if (prev !== alice) prev.dispose();
+          return next;
+        });
+        setPage(0);
+      } catch (e) {
+        window.alert((e as Error).message ?? "Couldn't open that PDF.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [alice],
+  );
 
   const next = useCallback(() => setPage((p) => Math.min(p + 1, total)), [total]);
   const prev = useCallback(() => setPage((p) => Math.max(p - 1, 0)), []);
@@ -126,6 +157,8 @@ export default function App() {
       <div className="sr-only" role="status" aria-live="polite">
         {announce}
       </div>
+
+      <UploadButton onFile={loadPdf} busy={busy} />
 
       {/* Table of contents */}
       <button
